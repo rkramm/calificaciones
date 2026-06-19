@@ -401,6 +401,51 @@ function handleRestoreBackupJSON(event) {
     };
     reader.readAsText(file);
 }
+
+function downloadHistoricosFromCloud() {
+    if (!CLOUD_MODE_ENABLED) {
+        alert('El modo nube está desactivado.');
+        return;
+    }
+    if (!confirm('¿Desea descargar los datos históricos y asignaciones históricas desde la Nube?\n\nEsto reemplazará los datos locales de estas tablas por los del servidor.')) return;
+
+    showProgressBar('Descargando datos históricos desde la Nube...');
+
+    Promise.all([
+        cloudGet('historicos'),
+        cloudGet('asigna_historico')
+    ]).then(([historicos, asignaciones]) => {
+        const tx = dbInstance.transaction(['historicos', 'asigna_historico'], 'readwrite');
+        const histStore = tx.objectStore('historicos');
+        const asigStore = tx.objectStore('asigna_historico');
+
+        histStore.clear().onsuccess = () => {
+            if (Array.isArray(historicos)) {
+                historicos.forEach(r => histStore.put(r));
+            }
+        };
+
+        asigStore.clear().onsuccess = () => {
+            if (Array.isArray(asignaciones)) {
+                asignaciones.forEach(a => asigStore.put(a));
+            }
+        };
+
+        tx.oncomplete = () => {
+            hideProgressBar();
+            alert('Datos históricos descargados correctamente. Vaya al tab Históricos para visualizarlos.');
+        };
+
+        tx.onerror = () => {
+            hideProgressBar();
+            alert('Error al guardar los datos descargados localmente.');
+        };
+    }).catch(err => {
+        hideProgressBar();
+        console.error('Error descargando datos históricos:', err);
+        alert('Error de red al descargar datos históricos. Verifique su conexión.');
+    });
+}
 /* =============================================================================== */
 
 function getStatusInfo(score) {
@@ -453,6 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupEventListeners() {
     document.getElementById('btn-login').addEventListener('click', handleLogin);
     document.getElementById('btn-sync-cloud').addEventListener('click', syncAllToCloud);
+    document.getElementById('btn-download-cloud').addEventListener('click', downloadHistoricosFromCloud);
     document.getElementById('btn-logout').addEventListener('click', handleLogout);
     document.getElementById('btn-save-items').addEventListener('click', saveAdminItems);
     document.getElementById('btn-save-scores').addEventListener('click', (e) => { e.preventDefault(); saveEvaluatorScores(null); });

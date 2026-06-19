@@ -39,18 +39,14 @@ function doPost(e) {
         sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
       }
     } else {
-      // Modo incremental: actualizar/agregar/eliminar por clave primaria
+      // Modo incremental: actualizar/agregar por clave primaria, NUNCA borrar
       const keyField = getKeyField(tableName);
-      const existingValues = sheet.getDataRange().getDisplayValues();
-      const existingHeaders = existingValues.length > 0 ? existingValues[0] : headers;
-      const keyIndex = existingHeaders.indexOf(keyField);
       
-      if (keyIndex === -1 && headers) {
-        // Si no hay headers, escribirlos
-        if (existingValues.length === 0 || existingValues[0].length === 1 && existingValues[0][0] === '') {
-          sheet.clearContents();
-          sheet.appendRow(headers);
-        }
+      // Asegurar headers iniciales si la hoja está vacía
+      const initialValues = sheet.getDataRange().getDisplayValues();
+      if (initialValues.length === 0 || (initialValues.length === 1 && initialValues[0].length === 1 && initialValues[0][0] === '')) {
+        sheet.clearContents();
+        if (headers) sheet.appendRow(headers);
       }
       
       if (dataArray && dataArray.length > 0) {
@@ -58,6 +54,7 @@ function doPost(e) {
         const refreshedHeaders = refreshedValues.length > 0 ? refreshedValues[0] : headers;
         const refreshedKeyIndex = refreshedHeaders.indexOf(keyField);
         
+        // Construir mapa de filas existentes por clave primaria
         const rowMap = {};
         for (let i = 1; i < refreshedValues.length; i++) {
           const key = refreshedValues[i][refreshedKeyIndex];
@@ -71,7 +68,7 @@ function doPost(e) {
             // Actualizar fila existente
             sheet.getRange(rowMap[keyValue] + 1, 1, 1, rowData.length).setValues([rowData]);
           } else {
-            // Agregar nueva fila
+            // Agregar nueva fila al final
             sheet.appendRow(rowData);
           }
         });

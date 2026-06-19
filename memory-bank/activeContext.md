@@ -12,8 +12,8 @@
 
 ## Enfoque actual
 - Verificar estabilidad del nuevo módulo histórico.
-- Validar sincronización incremental segura con Google Sheets.
+- Validar sincronización incremental segura con Google Sheets (sin borrar datos manuales).
+- Validar botón 'Descargar desde Nube' para traer históricos y asignaciones históricas.
+- Validar que al abrir el sistema se puedan visualizar los históricos descargados.
 - Validar respaldo automático en Sheets y JSON local antes de sincronizar.
 - Validar botón Cancelar durante la sincronización.
-- Validar recuperación de datos históricos eliminados desde respaldo JSON.
-- Validar persistencia y recuperación de asignaciones históricas desde Google Sheets.
