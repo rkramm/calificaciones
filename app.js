@@ -1824,10 +1824,7 @@ function attemptEvaluatorLogin(evaluadores, userInput, passInput) {
         if (CLOUD_MODE_ENABLED) {
             backgroundSyncForEvaluator();
         }
-    }, false).catch(err => {
-        console.error('Error cargando datos del evaluador:', err);
-        alert('Error al cargar los datos locales.\n\nPor favor, recargue la página o contacte al administrador.');
-    });
+    }, false);
 }
 
 function backgroundSyncForEvaluator() {
