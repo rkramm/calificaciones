@@ -44,7 +44,7 @@ html { scroll-behavior: smooth; }
 .login-status-indicator { margin-top: 25px; font-size: 0.8rem; color: #718096; display: flex; justify-content: center; align-items: center; gap: 8px; }
 .status-dot { display: inline-block; width: 10px; height: 10px; background-color: #CBD5E0; border-radius: 50%; transition: background-color 0.4s ease; box-shadow: 0 0 0 2px rgba(255,255,255,0.8); }
 
-.container { width: 100%; max-width: 1400px; margin: 0 auto; }
+.container { width: 100%; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; height: calc(100vh - 32px); }
 .card { background: var(--white); padding: 18px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 14px; }
 .compact-card { padding: 14px; margin-bottom: 12px; }
 .hidden { display: none !important; }
@@ -188,6 +188,25 @@ button { font-family: 'Segoe UI', sans-serif; }
     color: #FFF;
     border-color: var(--primary-blue);
     box-shadow: 0 2px 6px rgba(0, 107, 185, 0.3);
+}
+
+/* Layout para Vista Evaluador */
+#evaluador-view {
+    flex: 1 !important;
+    overflow: hidden !important;
+}
+
+#evaluador-view > div:nth-child(1) {
+    flex-shrink: 0;
+}
+
+#evaluador-view > div:nth-child(2) {
+    flex-shrink: 0;
+}
+
+#evaluador-view > div:nth-child(3) {
+    flex: 1;
+    overflow: hidden;
 }
 
 /* =============== MEDIA QUERIES RESPONSIVE =============== */
