@@ -269,18 +269,16 @@ function doGet(e) {
       const headers = values[0];
       const data = [];
 
-      // Buscar la columna que contiene el nombre de la entidad
-      const entidadColIndex = headers.findIndex(h => {
-        const header = h.toString().trim().toLowerCase();
-        return header.includes('entidad') || header.includes('razon social') || header.includes('razón social') || header.includes('nombre');
-      });
-
-      // Si no se encuentra columna de entidad, devolver debug claro
-      if (entidad && entidadColIndex < 0) {
-        return ContentService.createTextOutput(JSON.stringify({
-          data: [],
-          debug: 'No se encontro columna de entidad en ' + sheetName + '. Encabezados: ' + headers.join(' | ')
-        })).setMimeType(ContentService.MimeType.JSON);
+      // Para DS49: Búsqueda flexible de columnas por índice o nombre
+      // Columnas esperadas: A (Código), I (Nombre Proyecto), F (Familias), D (Comuna), C (Modalidad)
+      // También buscar columna de entidad (puede estar en B o G)
+      let entidadColIndex = -1;
+      for (let j = 0; j < headers.length; j++) {
+        const header = headers[j].toString().trim().toLowerCase();
+        if (header.includes('entidad') || header.includes('razon') || header.includes('razón') || header.includes('empresa')) {
+          entidadColIndex = j;
+          break;
+        }
       }
 
       const targetEntidad = normalizeEntidad(entidad);
@@ -288,20 +286,30 @@ function doGet(e) {
       let coincidencias = 0;
 
       for (let i = 1; i < values.length; i++) {
-        filasEvaluadas++;
-        const obj = {};
-        for (let j = 0; j < headers.length; j++) {
-          obj[headers[j]] = values[i][j];
+        const row = values[i];
+
+        // Verificar si hay datos en la fila
+        if (!row || row.length === 0 || !row.some(v => v)) {
+          continue;
         }
 
-        // Filtrar por nombre de entidad si se proporciona
-        if (targetEntidad && entidadColIndex >= 0) {
-          const cellEntidad = normalizeEntidad(values[i][entidadColIndex]);
+        filasEvaluadas++;
+
+        // Filtrar por nombre de entidad si se proporciona y se encontró columna
+        if (targetEntidad && entidadColIndex >= 0 && row[entidadColIndex]) {
+          const cellEntidad = normalizeEntidad(row[entidadColIndex].toString());
           // Coincidencia exacta o parcial
           if (cellEntidad !== targetEntidad && !cellEntidad.includes(targetEntidad) && !targetEntidad.includes(cellEntidad)) {
             continue;
           }
-          coincidencias++;
+        }
+
+        coincidencias++;
+
+        // Crear objeto con todos los campos del header
+        const obj = {};
+        for (let j = 0; j < headers.length; j++) {
+          obj[headers[j]] = row[j] || '';
         }
 
         data.push(obj);
@@ -309,7 +317,7 @@ function doGet(e) {
 
       return ContentService.createTextOutput(JSON.stringify({
         data: data,
-        debug: 'Programa: ' + programa + ', Pestaña: ' + sheetName + ', Filas evaluadas: ' + filasEvaluadas + ', Coincidencias: ' + coincidencias + ', Entidad buscada: ' + entidad
+        debug: 'Programa: ' + programa + ', Pestaña: ' + sheetName + ', Filas evaluadas: ' + filasEvaluadas + ', Coincidencias: ' + coincidencias + ', Entidad buscada: ' + entidad + ', Columna entidad: ' + entidadColIndex
       })).setMimeType(ContentService.MimeType.JSON);
     }
 

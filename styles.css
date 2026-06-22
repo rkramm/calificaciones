@@ -163,10 +163,10 @@ button { font-family: 'Segoe UI', sans-serif; }
 #eval-entity-tabs-container .tab-button {
     display: block;
     width: 100%;
-    padding: 6px 6px;
-    font-size: 0.7rem;
+    padding: 4px 2px;
+    font-size: 0.6rem;
     text-align: center;
-    border-radius: 3px;
+    border-radius: 2px;
     border: 1px solid #D0D5E0;
     background: #FFF;
     color: var(--primary-dark);
@@ -174,8 +174,14 @@ button { font-family: 'Segoe UI', sans-serif; }
     cursor: pointer;
     white-space: normal;
     word-break: break-word;
-    line-height: 1.2;
+    line-height: 1.1;
     transition: all 0.2s;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 #eval-entity-tabs-container .tab-button:hover {
