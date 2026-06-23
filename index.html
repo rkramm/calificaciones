@@ -477,6 +477,18 @@
         <div class="tabs-nav hidden" id="evaluador-internal-tabs"></div>
     </div>
 
+    <!-- Modal para descarga de asignaciones -->
+    <div id="download-asignaciones-modal" class="modal-overlay hidden" style="display: flex; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 40px; border-radius: 8px; text-align: center; min-width: 300px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <h3 style="margin-bottom: 20px; color: #1a5490;">📥 Sincronizando Asignaciones</h3>
+            <p style="margin-bottom: 20px; color: #666; font-size: 0.95rem;">Descargando datos desde el servidor...</p>
+            <div style="background: #f0f0f0; height: 30px; border-radius: 4px; overflow: hidden; margin-bottom: 15px;">
+                <div id="download-progress-bar" style="background: linear-gradient(90deg, #16A085, #1abc9c); height: 100%; width: 0%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem; font-weight: bold;"></div>
+            </div>
+            <p id="download-status-text" style="color: #999; font-size: 0.85rem;">Iniciando...</p>
+        </div>
+    </div>
+
     <div id="audit-modal" class="modal-overlay hidden">
         <div class="modal-content card">
             <div class="modal-header-box">

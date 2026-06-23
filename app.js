@@ -1863,10 +1863,74 @@ function loadEvaluatorWithAsignaciones(userAsignaciones) {
             renderCoverageTabs();
         }, 100);
 
-        // Sincronizar en segundo plano para evaluadores (sin bloquear)
+        // 📥 SINCRONIZAR ASIGNACIONES DESDE EL SERVIDOR (en background con progreso visual)
         if (CLOUD_MODE_ENABLED) {
+            setTimeout(() => {
+                syncAsignacionesFromCloud();
+            }, 500);
+
+            // Sincronizar scores en segundo plano
             backgroundSyncForEvaluator();
         }
+    });
+}
+
+/**
+ * Descarga asignaciones desde Google Sheet y muestra progreso
+ */
+function syncAsignacionesFromCloud() {
+    const modal = document.getElementById('download-asignaciones-modal');
+    const progressBar = document.getElementById('download-progress-bar');
+    const statusText = document.getElementById('download-status-text');
+
+    if (!modal) return;
+
+    // Mostrar modal
+    modal.classList.remove('hidden');
+    progressBar.style.width = '0%';
+    statusText.textContent = 'Iniciando descarga...';
+
+    // Simular progreso
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 30;
+        if (progress > 90) progress = 90;
+        progressBar.style.width = progress + '%';
+    }, 200);
+
+    // Descargar asignaciones del Google Sheet
+    cloudGet('asignaciones').then(cloudAsignaciones => {
+        clearInterval(progressInterval);
+        progress = 95;
+        progressBar.style.width = progress + '%';
+        statusText.textContent = 'Guardando datos localmente...';
+
+        // Guardar en IndexedDB
+        if (cloudAsignaciones && cloudAsignaciones.length > 0) {
+            const tx = dbInstance.transaction(['asignaciones'], 'readwrite');
+            const store = tx.objectStore('asignaciones');
+            cloudAsignaciones.forEach(a => store.put(a));
+
+            tx.oncomplete = () => {
+                progress = 100;
+                progressBar.style.width = progress + '%';
+                statusText.textContent = '✅ Sincronización completa';
+
+                // Cerrar modal después de 1 segundo
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 1000);
+            };
+        }
+    }).catch(error => {
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        statusText.textContent = '⚠️ Error en sincronización (usando caché local)';
+
+        // Cerrar modal después de 2 segundos
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 2000);
     });
 }
 
