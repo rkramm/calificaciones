@@ -1797,7 +1797,9 @@ function attemptEvaluatorLogin(evaluadores, userInput, passInput) {
         console.log('📌 Asignaciones del usuario:', userAsignaciones);
 
         if(userAsignaciones.length === 0) {
-            alert('No tiene precalificaciones asignadas en este momento.\n\nContacte al administrador para que le asigne coberturas de evaluación.');
+            console.error('❌ Asignaciones vacías para RUT:', currentUser.rut);
+            console.error('Total asignaciones en IndexedDB:', asignaciones?.length || 0);
+            alert('❌ No tiene precalificaciones asignadas en este momento.\n\nContacte al administrador para que le asigne coberturas de evaluación.\n\n(Verifique que: 1) La tabla "asignaciones" tenga datos en el Google Sheet, 2) Su RUT esté incluido)');
             restoreConnectionStatus();
             return;
         }
