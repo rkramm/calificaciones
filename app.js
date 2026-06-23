@@ -2201,6 +2201,13 @@ window.changeStage = function(stageNum) {
     currentStage = stageNum;
     const containerId = (currentRole === 'admin') ? 'admin-tabs' : 'evaluador-tabs';
     const container = document.getElementById(containerId);
+
+    // Si el contenedor no existe, no continuar
+    if (!container) {
+        console.warn(`Contenedor de tabs no encontrado: ${containerId}`);
+        return;
+    }
+
     container.innerHTML = '';
     
     let etapasDisponibles = [1,2,3,4,5,6]; 
