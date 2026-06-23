@@ -253,6 +253,13 @@ button { font-family: 'Segoe UI', sans-serif; }
     .evaluation-table th, .evaluation-table td { padding: 5px 8px; }
 }
 
+/* Animación para barra de progreso */
+@keyframes progress-animation {
+    0% { background-position: 0% center; }
+    50% { background-position: 100% center; }
+    100% { background-position: 0% center; }
+}
+
 @media (max-width: 768px) {
     body { padding: 12px 8px; }
     .container { max-width: 100%; }

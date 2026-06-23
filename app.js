@@ -2080,11 +2080,16 @@ function renderStagesForEvaluator(activeAsig) {
 function renderProjectsTable(programa, entidadNombre) {
     const head = document.getElementById('eval-projects-head');
     const body = document.getElementById('eval-projects-body');
+    const progressBar = document.getElementById('eval-progress-bar');
 
     if (!programa) {
         body.innerHTML = '<tr><td colspan="5" class="text-center">No hay programa definido para la cobertura actual.</td></tr>';
+        if (progressBar) progressBar.classList.add('hidden');
         return;
     }
+
+    // Mostrar barra de progreso
+    if (progressBar) progressBar.classList.remove('hidden');
 
     // DS49 requiere columna Código Proyecto adicional
     if (programa === 'DS49') {
@@ -2113,6 +2118,9 @@ function renderProjectsTable(programa, entidadNombre) {
     body.innerHTML = `<tr><td colspan="6" class="text-center">Cargando proyectos para: ${entidadNombre} (${programa})...</td></tr>`;
 
     cloudGetProjects(programa, entidadNombre).then(proyectos => {
+        // Ocultar barra de progreso
+        if (progressBar) progressBar.classList.add('hidden');
+
         if (!Array.isArray(proyectos) || proyectos.length === 0) {
             const cols = programa === 'DS49' ? '6' : '5';
             body.innerHTML = `<tr><td colspan="${cols}" class="text-center">No se encontraron proyectos para "${entidadNombre}" en ${programa}.</td></tr>`;
@@ -2142,6 +2150,8 @@ function renderProjectsTable(programa, entidadNombre) {
         }
     }).catch(err => {
         console.error('Error cargando proyectos:', err);
+        // Ocultar barra de progreso
+        if (progressBar) progressBar.classList.add('hidden');
         const cols = programa === 'DS49' ? '6' : '5';
         body.innerHTML = `<tr><td colspan="${cols}" class="text-center">Error al cargar proyectos. Intente nuevamente.</td></tr>`;
     });
