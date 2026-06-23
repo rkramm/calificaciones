@@ -92,8 +92,8 @@ input[type="number"] { -moz-appearance: textfield; }
 .checkbox-block-item input[type="checkbox"],
 .all-stages-label input[type="checkbox"] {
     margin: 0 !important;
-    margin-top: 2px !important; /* Alinea perfectamente con la primera línea de texto */
-    flex-shrink: 0 !important; /* Evita que el navegador aplaste el checkbox */
+    margin-top: 2px !important; 
+    flex-shrink: 0 !important; 
     width: 16px !important;
     height: 16px !important;
     cursor: pointer;
@@ -124,8 +124,6 @@ input[type="number"] { -moz-appearance: textfield; }
 .historico-tabs-vertical { display: flex; flex-direction: column; gap: 4px; min-width: 90px; }
 .historico-tabs-vertical .tab-button { border-radius: 4px; text-align: left; padding: 8px 10px; }
 
-.timing-dashboard { display: flex; justify-content: space-between; align-items: center; background: #25306B; color: #FFF; padding: 10px 20px; margin-bottom: 10px; border-radius: 4px; font-size: 0.88rem; }
-.countdown-container { background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 4px; }
 .countdown-clock { color: #FF4D4D; font-weight: bold; font-family: monospace; }
 
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
@@ -133,7 +131,6 @@ input[type="number"] { -moz-appearance: textfield; }
 .modal-header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-dark); padding-bottom: 6px; }
 .btn-close { background: none; border: none; font-size: 2rem; cursor: pointer; color: #666; }
 
-.summary-global-card { display: none !important; }
 .score-badge { background-color: var(--primary-dark); color: var(--white); padding: 2px 10px; font-weight: bold; border-radius: 4px; }
 .status-text-inline { font-weight: bold; padding: 2px 8px; border-radius: 4px; }
 
@@ -151,14 +148,6 @@ button { font-family: 'Segoe UI', sans-serif; }
 .btn:hover { opacity: 0.9; }
 
 /* Estilos para detalles de entidad */
-.eval-entity-detail-item {
-    padding: 8px 0;
-    border-bottom: 1px solid #E8EAED;
-}
-.eval-entity-detail-item:last-child {
-    border-bottom: none;
-}
-
 /* Sidebar de entidades con tabs verticales */
 #eval-entity-tabs-container {
     width: 100%;
@@ -208,19 +197,17 @@ button { font-family: 'Segoe UI', sans-serif; }
     background: rgba(255, 255, 255, 0.2);
     color: #FFF;
     border: 1px solid rgba(255, 255, 255, 0.4);
-    padding: 4px 12px;
-    font-size: 0.75rem;
+    padding: 6px 16px;
+    font-size: 0.8rem;
     font-weight: 600;
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: auto;
-    height: auto;
+    min-height: 1.8rem;
     white-space: nowrap;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    line-height: 1.2;
 }
 
 #evaluador-coverage-tabs .tab-button:hover {
@@ -236,38 +223,38 @@ button { font-family: 'Segoe UI', sans-serif; }
     font-weight: 700;
 }
 
-/* Layout para Vista Evaluador */
+/* ================= LAYOUT VISTA EVALUADOR ================= */
 #evaluador-view {
     flex: 1 !important;
     overflow: hidden !important;
 }
 
-#evaluador-view > div:nth-child(1) {
-    flex-shrink: 0;
+/* 1. Elementos superiores fijos: Alertas, Barras de carga y Barra de Coberturas */
+#evaluador-view > #deadline-alert,
+#evaluador-view > #eval-progress-bar,
+#evaluador-view > div[style*="background: transparent"] {
+    flex-shrink: 0 !important;
 }
 
-#evaluador-view > div:nth-child(2) {
-    flex-shrink: 0;
+/* 2. SECCIÓN 3 (Entidades + Proyectos): Panel superior intermedio */
+#evaluador-view > div[style*="background: #F5F7FA"] {
+    flex-shrink: 0 !important;
+    max-height: 45%;
 }
 
-#evaluador-view > div:nth-child(3) {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
+/* 3. SECCIÓN 5 (Etapas + Tabla): Absorbe el 100% del alto restante de la pantalla */
+#evaluador-view > div:last-of-type {
+    flex: 1 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
-#evaluador-view > div:nth-child(3) > div {
-    flex: 1;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Tabla de evaluación con scroll */
+/* 4. Contenedor de la tabla con scroll interno e independiente */
 #table-card-container {
     flex: 1 !important;
     overflow-y: auto !important;
-    min-height: 0;
+    min-height: 0 !important;
 }
 
 /* =============== MEDIA QUERIES RESPONSIVE =============== */
