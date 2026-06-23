@@ -1925,6 +1925,7 @@ function showPanel(titleText) {
         toggleElement('btn-save-scores', true);
         toggleElement('btn-eval-pdf', true);
         checkDeadlineStatus();
+        startCountdownClock();
         renderCoverageTabs();
     }
 }
@@ -2029,13 +2030,13 @@ function renderEvaluatorHeaderInfo() {
         if (convenioEl) convenioEl.textContent = convenio || '---';
         if (fechaEl) fechaEl.textContent = fecha || '---';
         if (programaEl) programaEl.textContent = activeAsig.programa || '---';
+
+        // Renderizar tabla de proyectos según programa (dentro del callback para asegurar datos listos)
+        renderProjectsTable(activeAsig.programa, window.currentSelectedEntity);
+
+        // Renderizar etapas a calificar
+        renderStagesForEvaluator(activeAsig);
     });
-
-    // Renderizar tabla de proyectos según programa
-    renderProjectsTable(activeAsig.programa, window.currentSelectedEntity);
-
-    // Renderizar etapas a calificar
-    renderStagesForEvaluator(activeAsig);
 }
 
 /**
