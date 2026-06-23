@@ -2263,16 +2263,32 @@ function renderProjectsTableAllPrograms(asignaciones, entidadNombre) {
                         return;
                     }
 
-                    body.innerHTML = todosLosProyectos.map(p => `
-                        <tr>
-                            <td>${p.Código || p.codigo || p.Codigo || ''}</td>
-                            <td>${p['Nombre del proy'] || p['Nombre Proyecto'] || p.nombre_proyecto || p.Nombre || ''}</td>
-                            <td>${p.Comuna || p.comuna || ''}</td>
-                            <td>${p['Modal.'] || p.Modalidad || p.modalidad || ''}</td>
-                            <td>${p.Familias || p['N°familias'] || p.Nfamilias || p.familias || ''}</td>
-                            <td>${p.Año || p.ano || p.anio || ''}</td>
-                        </tr>
-                    `).join('');
+                    // Verificar si todos los proyectos son DS10
+                    const soloDS10 = todosLosProyectos.every(p => p._programa === 'DS10');
+
+                    if (soloDS10) {
+                        // Para DS10: solo mostrar Comuna, Modal., Familias, Año (4 columnas)
+                        body.innerHTML = todosLosProyectos.map(p => `
+                            <tr>
+                                <td>${p.Comuna || p.comuna || ''}</td>
+                                <td>${p['Modal.'] || p.Modalidad || p.modalidad || ''}</td>
+                                <td>${p.Familias || p['N°familias'] || p.Nfamilias || p.familias || ''}</td>
+                                <td>${p.Año || p.ano || p.anio || ''}</td>
+                            </tr>
+                        `).join('');
+                    } else {
+                        // Para DS27, DS49 o mezcla: mostrar todas las 6 columnas
+                        body.innerHTML = todosLosProyectos.map(p => `
+                            <tr>
+                                <td>${p.Código || p.codigo || p.Codigo || ''}</td>
+                                <td>${p['Nombre del proy'] || p['Nombre Proyecto'] || p.nombre_proyecto || p.Nombre || ''}</td>
+                                <td>${p.Comuna || p.comuna || ''}</td>
+                                <td>${p['Modal.'] || p.Modalidad || p.modalidad || ''}</td>
+                                <td>${p.Familias || p['N°familias'] || p.Nfamilias || p.familias || ''}</td>
+                                <td>${p.Año || p.ano || p.anio || ''}</td>
+                            </tr>
+                        `).join('');
+                    }
                 }
             });
     });
