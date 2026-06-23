@@ -1768,38 +1768,46 @@ function handleLogin() {
     }
 }
 
-function attemptEvaluatorLogin(evaluadores, userInput, passInput) {
+async function attemptEvaluatorLogin(evaluadores, userInput, passInput) {
     const evResult = evaluadores.find(e => e.rut === userInput);
-    if (!evResult) { 
+    if (!evResult) {
         alert('RUT de evaluador no registrado.\n\nVerifique que el RUT esté correctamente ingresado o contacte al administrador.');
         restoreConnectionStatus();
-        return; 
+        return;
     }
-    
+
     const validPass = evResult.clave || '123456';
-    if (validPass !== passInput) { 
-        alert('Contraseña incorrecta.'); 
+    if (validPass !== passInput) {
+        alert('Contraseña incorrecta.');
         restoreConnectionStatus();
-        return; 
+        return;
     }
-    
+
     currentUser = evResult;
     currentRole = 'evaluador';
 
-    // Cargar asignaciones y scores del evaluador en paralelo
-    getMultipleStores(['asignaciones', 'scores'], ([asignaciones, scores]) => {
-        console.log('📊 Todas las asignaciones en DB:', asignaciones.length);
+    try {
+        // Descargar asignaciones DIRECTAMENTE del Google Sheet (no desde IndexedDB)
+        const cloudAsignaciones = await cloudGet('asignaciones');
+        console.log('☁️ Asignaciones descargadas del Google Sheet:', cloudAsignaciones?.length || 0);
         console.log('👤 RUT del usuario actual:', currentUser.rut);
-        console.log('📋 Asignaciones totales:', asignaciones);
+        console.log('📋 Todas las asignaciones en cloud:', cloudAsignaciones);
 
-        const userAsignaciones = asignaciones.filter(a => a.rut === currentUser.rut);
+        if (!cloudAsignaciones || cloudAsignaciones.length === 0) {
+            console.error('❌ No hay asignaciones en el Google Sheet');
+            alert('⚠️ Error: No hay asignaciones en el sistema.\n\nContacte al administrador.');
+            restoreConnectionStatus();
+            return;
+        }
+
+        const userAsignaciones = cloudAsignaciones.filter(a => a.rut === currentUser.rut);
         console.log('✅ Asignaciones filtradas por RUT:', userAsignaciones.length);
         console.log('📌 Asignaciones del usuario:', userAsignaciones);
 
         if(userAsignaciones.length === 0) {
             console.error('❌ Asignaciones vacías para RUT:', currentUser.rut);
-            console.error('Total asignaciones en IndexedDB:', asignaciones?.length || 0);
-            alert('❌ No tiene precalificaciones asignadas en este momento.\n\nContacte al administrador para que le asigne coberturas de evaluación.\n\n(Verifique que: 1) La tabla "asignaciones" tenga datos en el Google Sheet, 2) Su RUT esté incluido)');
+            console.error('Total asignaciones en Google Sheet:', cloudAsignaciones?.length || 0);
+            alert('❌ No tiene precalificaciones asignadas en este momento.\n\nContacte al administrador para que le asigne coberturas de evaluación.\n\n(Verifique que su RUT esté incluido en la tabla "asignaciones" del Google Sheet)');
             restoreConnectionStatus();
             return;
         }
@@ -1820,31 +1828,27 @@ function attemptEvaluatorLogin(evaluadores, userInput, passInput) {
             };
         }).sort((a, b) => a.cobertura.localeCompare(b.cobertura));
 
-        allMemoryScores = scores.filter(r => r.rutEvaluador === currentUser.rut);
-        currentCoverage = allAsignacionesMapped[0].cobertura;
-        const matchingConfig = allAsignacionesMapped.find(a => a.cobertura === currentCoverage);
-        currentStage = matchingConfig ? matchingConfig.etapas[0] : 1;
+        // Cargar scores desde IndexedDB
+        dbGetAll('scores', (scores) => {
+            allMemoryScores = scores.filter(r => r.rutEvaluador === currentUser.rut);
 
-        // Detectar discrepancia: si hay asignaciones pero pocas entidades, sincronizar desde nube
-        if (allAsignacionesMapped.length > 1 && CLOUD_MODE_ENABLED) {
-            console.log('⚠️ Detectada posible desincronización - forzando sync desde nube');
-            cloudGet('asignaciones').then(cloudData => {
-                if (cloudData && cloudData.length > asignaciones.length) {
-                    console.log('🔄 Sincronizando asignaciones desde nube...');
-                    cloudSave('asignaciones', cloudData, 'replace');
-                }
-            });
-        }
+            currentCoverage = allAsignacionesMapped[0].cobertura;
+            const matchingConfig = allAsignacionesMapped.find(a => a.cobertura === currentCoverage);
+            currentStage = matchingConfig ? matchingConfig.etapas[0] : 1;
 
+            restoreConnectionStatus();
+            showPanel('Sistema de Precalificación Técnica');
+
+            // Sincronizar en segundo plano para evaluadores (sin bloquear)
+            if (CLOUD_MODE_ENABLED) {
+                backgroundSyncForEvaluator();
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error al descargar asignaciones:', error);
+        alert('❌ Error al conectar con el servidor.\n\nVerifique su conexión a internet e intente nuevamente.');
         restoreConnectionStatus();
-        showPanel('Sistema de Precalificación Técnica');
-        startCountdownClock();
-        
-        // Sincronizar en segundo plano para evaluadores (sin bloquear)
-        if (CLOUD_MODE_ENABLED) {
-            backgroundSyncForEvaluator();
-        }
-    }, false);
+    }
 }
 
 function backgroundSyncForEvaluator() {
@@ -1952,9 +1956,21 @@ function showPanel(titleText) {
 
 function renderCoverageTabs() {
     const container = document.getElementById('evaluador-coverage-tabs');
+    console.log('🔍 renderCoverageTabs llamado');
+    console.log('📦 allAsignacionesMapped:', allAsignacionesMapped);
+    console.log('📦 allAsignacionesMapped.length:', allAsignacionesMapped?.length || 0);
+
+    if (!container) {
+        console.error('❌ Container evaluador-coverage-tabs no encontrado');
+        return;
+    }
+
     container.innerHTML = '';
     // Obtener coberturas ÚNICAS (no duplicadas)
     const uniqueCoberturas = [...new Set(allAsignacionesMapped.map(a => a.cobertura))];
+    console.log('🏷️ Coberturas únicas encontradas:', uniqueCoberturas);
+    console.log('🏷️ Total de coberturas:', uniqueCoberturas.length);
+
     uniqueCoberturas.forEach(cobertura => {
         const btn = document.createElement('button');
         btn.className = `tab-button ${currentCoverage === cobertura ? 'active' : ''}`;
@@ -1967,15 +1983,20 @@ function renderCoverageTabs() {
         };
         container.appendChild(btn);
     });
+    console.log('✅ Botones de cobertura renderizados:', uniqueCoberturas.length);
     renderEvaluatorHeaderInfo();
     window.changeStage(currentStage);
 }
 
 /**
  * Renderiza las pestañas de entidades, detalles y proyectos asociados a la cobertura activa del evaluador.
+ * Las ENTIDADES siempre se muestran (vienen de asignaciones)
+ * Los PROYECTOS se cargan en segundo plano (son opcionales)
  */
 function renderEvaluatorHeaderInfo() {
     const allCoverageAsigs = allAsignacionesMapped.filter(a => a.cobertura === currentCoverage);
+    console.log('📋 renderEvaluatorHeaderInfo - allCoverageAsigs:', allCoverageAsigs);
+
     if (!allCoverageAsigs || allCoverageAsigs.length === 0) {
         const tabsEl = document.getElementById('eval-entity-tabs-container');
         const detailsEl = document.getElementById('eval-entity-details');
@@ -1990,87 +2011,96 @@ function renderEvaluatorHeaderInfo() {
     }
 
     // Crear pestañas de entidades basadas en cobertura actual
-    // Si hay múltiples entidades en la cobertura, cada una tendrá una pestaña
+    // Las ENTIDADES son PRIMARIAS: siempre se muestran
     const uniqueEntities = [...new Set(allCoverageAsigs.map(a => a.entidadNombre))];
+    console.log('👥 Entidades únicas en cobertura:', uniqueEntities);
 
     // Si no hay entidad seleccionada, usar la primera
     if (!window.currentSelectedEntity) {
         window.currentSelectedEntity = allCoverageAsigs[0].entidadNombre;
     }
 
-    // Renderizar pestañas de entidades
+    // Renderizar pestañas de entidades SIEMPRE
     const tabsContainer = document.getElementById('eval-entity-tabs-container');
-    tabsContainer.innerHTML = '';
-    uniqueEntities.forEach(entidadNombre => {
-        const btn = document.createElement('button');
-        btn.className = `tab-button ${window.currentSelectedEntity === entidadNombre ? 'active' : ''}`;
-        btn.textContent = entidadNombre;
-        btn.style.fontSize = '0.8rem';
-        btn.style.padding = '6px 10px';
-        btn.onclick = () => {
-            window.currentSelectedEntity = entidadNombre;
-            renderEvaluatorHeaderInfo();
-        };
-        tabsContainer.appendChild(btn);
-    });
-
-    // Buscar datos de la entidad en IndexedDB
-    dbGetAll('entidades', (entidades) => {
-        // Buscar TODAS las asignaciones para la entidad seleccionada (múltiples programas)
-        const asignsForEntity = allAsignacionesMapped.filter(a =>
-            a.entidadNombre === window.currentSelectedEntity
-        );
-
-        if (!asignsForEntity || asignsForEntity.length === 0) {
-            console.warn('No se encontró asignación para:', {entidad: window.currentSelectedEntity});
-            return;
-        }
-
-        // Usar la primera para mostrar datos básicos
-        const selectedAsig = asignsForEntity[0];
-
-        const normalize = (str) => str.toString().trim().toLowerCase().replace(/\s+/g, ' ').replace(/\.+$/g, '').replace(/\s*ltda\.?\s*$/g, ' ltda').replace(/\s*spa\.?\s*$/g, ' spa');
-        const target = normalize(window.currentSelectedEntity);
-
-        let entidad = entidades.find(e => {
-            const nombre = e.nombre ? normalize(e.nombre) : '';
-            return nombre === target || nombre.includes(target) || target.includes(nombre);
+    if (tabsContainer) {
+        tabsContainer.innerHTML = '';
+        uniqueEntities.forEach(entidadNombre => {
+            const btn = document.createElement('button');
+            btn.className = `tab-button ${window.currentSelectedEntity === entidadNombre ? 'active' : ''}`;
+            btn.textContent = entidadNombre;
+            btn.style.fontSize = '0.8rem';
+            btn.style.padding = '6px 10px';
+            btn.onclick = () => {
+                window.currentSelectedEntity = entidadNombre;
+                renderEvaluatorHeaderInfo();
+            };
+            tabsContainer.appendChild(btn);
         });
-        entidad = entidad || {};
+    }
 
-        const getField = (obj, possibleKeys) => {
-            for (const key of possibleKeys) {
-                if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
-                    return obj[key];
-                }
-            }
-            return '';
-        };
+    // Buscar TODAS las asignaciones para la entidad seleccionada
+    const asignsForEntity = allAsignacionesMapped.filter(a =>
+        a.entidadNombre === window.currentSelectedEntity
+    );
 
-        const convenio = getField(entidad, ['convenio', 'Convenio', 'CONVENIO', 'N° Convenio Marco Seremi', 'N°ConvenioMarcoSeremi', 'convenio_marco', 'n_convenio']);
-        const fecha = getField(entidad, ['fecha', 'Fecha', 'FECHA', 'Fecha Convenio Marco', 'FechaConvenioMarco', 'fecha_convenio']);
+    if (!asignsForEntity || asignsForEntity.length === 0) {
+        console.warn('No se encontró asignación para:', {entidad: window.currentSelectedEntity});
+        return;
+    }
 
-        // Mostrar detalles de la entidad
-        const nameEl = document.getElementById('eval-entity-name');
-        const rutEl = document.getElementById('eval-entity-rut');
-        const convenioEl = document.getElementById('eval-entity-convenio');
-        const fechaEl = document.getElementById('eval-entity-fecha');
-        const programaEl = document.getElementById('eval-entity-programa');
+    console.log('📌 Asignaciones para entidad seleccionada:', asignsForEntity);
 
-        if (nameEl) nameEl.textContent = entidad.nombre || window.currentSelectedEntity || 'Sin Entidad';
-        if (rutEl) rutEl.textContent = entidad.rut || '---';
-        if (convenioEl) convenioEl.textContent = convenio || '---';
-        if (fechaEl) fechaEl.textContent = fecha || '---';
-        // Mostrar todos los programas asignados
+    // Usar la primera para mostrar datos básicos
+    const selectedAsig = asignsForEntity[0];
+
+    // Mostrar detalles de la entidad DIRECTAMENTE (desde asignaciones)
+    const nameEl = document.getElementById('eval-entity-name');
+    const rutEl = document.getElementById('eval-entity-rut');
+    const convenioEl = document.getElementById('eval-entity-convenio');
+    const fechaEl = document.getElementById('eval-entity-fecha');
+    const programaEl = document.getElementById('eval-entity-programa');
+
+    if (nameEl) nameEl.textContent = window.currentSelectedEntity || 'Sin Entidad';
+    if (programaEl) {
         const programas = asignsForEntity.map(a => a.programa).join(', ');
-        if (programaEl) programaEl.textContent = programas || '---';
+        programaEl.textContent = programas || '---';
+    }
 
-        // Renderizar tabla de proyectos para TODOS los programas asignados a esta entidad
-        renderProjectsTableAllPrograms(asignsForEntity, window.currentSelectedEntity);
+    // Intentar buscar datos adicionales en IndexedDB EN SEGUNDO PLANO (sin bloquear)
+    if (rutEl || convenioEl || fechaEl) {
+        dbGetAll('entidades', (entidades) => {
+            const normalize = (str) => str.toString().trim().toLowerCase().replace(/\s+/g, ' ').replace(/\.+$/g, '').replace(/\s*ltda\.?\s*$/g, ' ltda').replace(/\s*spa\.?\s*$/g, ' spa');
+            const target = normalize(window.currentSelectedEntity);
 
-        // Renderizar etapas a calificar (usar la primera asignación)
-        renderStagesForEvaluator(selectedAsig);
-    });
+            let entidad = entidades.find(e => {
+                const nombre = e.nombre ? normalize(e.nombre) : '';
+                return nombre === target || nombre.includes(target) || target.includes(nombre);
+            });
+            entidad = entidad || {};
+
+            const getField = (obj, possibleKeys) => {
+                for (const key of possibleKeys) {
+                    if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
+                        return obj[key];
+                    }
+                }
+                return '';
+            };
+
+            const convenio = getField(entidad, ['convenio', 'Convenio', 'CONVENIO', 'N° Convenio Marco Seremi', 'N°ConvenioMarcoSeremi', 'convenio_marco', 'n_convenio']);
+            const fecha = getField(entidad, ['fecha', 'Fecha', 'FECHA', 'Fecha Convenio Marco', 'FechaConvenioMarco', 'fecha_convenio']);
+
+            if (rutEl) rutEl.textContent = entidad.rut || '---';
+            if (convenioEl) convenioEl.textContent = convenio || '---';
+            if (fechaEl) fechaEl.textContent = fecha || '---';
+        });
+    }
+
+    // Renderizar tabla de proyectos EN SEGUNDO PLANO (son opcionales)
+    renderProjectsTableAllPrograms(asignsForEntity, window.currentSelectedEntity);
+
+    // Renderizar etapas a calificar
+    renderStagesForEvaluator(selectedAsig);
 }
 
 /**
@@ -2125,11 +2155,14 @@ function renderProjectsTableAllPrograms(asignaciones, entidadNombre) {
     const body = document.getElementById('eval-projects-body');
     const progressBar = document.getElementById('eval-progress-bar');
 
+    if (!body) return;
+
     if (!asignaciones || asignaciones.length === 0) {
         body.innerHTML = '<tr><td colspan="5" class="text-center">No hay programas asignados.</td></tr>';
         return;
     }
 
+    console.log('📦 renderProjectsTableAllPrograms para:', entidadNombre, 'asignaciones:', asignaciones.length);
     body.innerHTML = '<tr><td colspan="6" class="text-center">Cargando proyectos...</td></tr>';
     if (progressBar) progressBar.classList.remove('hidden');
 
@@ -2138,36 +2171,41 @@ function renderProjectsTableAllPrograms(asignaciones, entidadNombre) {
     let cargasCompletadas = 0;
 
     asignaciones.forEach(asig => {
-        cloudGetProjects(asig.programa, entidadNombre).then(proyectos => {
-            cargasCompletadas++;
-            if (proyectos && proyectos.length > 0) {
-                // Agregar el programa a cada proyecto
-                todosLosProyectos = todosLosProyectos.concat(
-                    proyectos.map(p => ({ ...p, _programa: asig.programa }))
-                );
-            }
-
-            // Cuando se completen todas las cargas
-            if (cargasCompletadas === asignaciones.length) {
-                if (progressBar) progressBar.classList.add('hidden');
-
-                if (todosLosProyectos.length === 0) {
-                    body.innerHTML = `<tr><td colspan="5" class="text-center">No se encontraron proyectos para "${entidadNombre}".</td></tr>`;
-                    return;
+        cloudGetProjects(asig.programa, entidadNombre)
+            .then(proyectos => {
+                console.log(`✅ Proyectos cargados para ${asig.programa}:`, proyectos?.length || 0);
+                cargasCompletadas++;
+                if (proyectos && proyectos.length > 0) {
+                    todosLosProyectos = todosLosProyectos.concat(
+                        proyectos.map(p => ({ ...p, _programa: asig.programa }))
+                    );
                 }
+            })
+            .catch(error => {
+                console.warn(`⚠️ Error al cargar proyectos para ${asig.programa}:`, error);
+                cargasCompletadas++;
+            })
+            .finally(() => {
+                // Cuando se completen todas las cargas (con éxito o error)
+                if (cargasCompletadas === asignaciones.length) {
+                    if (progressBar) progressBar.classList.add('hidden');
 
-                // Renderizar todos los proyectos
-                body.innerHTML = todosLosProyectos.map(p => `
-                    <tr>
-                        <td>${p['Nombre Proyecto'] || p.nombre_proyecto || p.Nombre || ''}</td>
-                        <td>${p.Comuna || p.comuna || ''}</td>
-                        <td>${p.Modalidad || p.modalidad || ''}</td>
-                        <td>${p['N°familias'] || p.Nfamilias || p.familias || ''}</td>
-                        <td>${p.Año || p.ano || p.anio || ''}</td>
-                    </tr>
-                `).join('');
-            }
-        });
+                    if (todosLosProyectos.length === 0) {
+                        body.innerHTML = `<tr><td colspan="5" class="text-center">Sin proyectos asignados para "${entidadNombre}".</td></tr>`;
+                        return;
+                    }
+
+                    body.innerHTML = todosLosProyectos.map(p => `
+                        <tr>
+                            <td>${p['Nombre Proyecto'] || p.nombre_proyecto || p.Nombre || ''}</td>
+                            <td>${p.Comuna || p.comuna || ''}</td>
+                            <td>${p.Modalidad || p.modalidad || ''}</td>
+                            <td>${p['N°familias'] || p.Nfamilias || p.familias || ''}</td>
+                            <td>${p.Año || p.ano || p.anio || ''}</td>
+                        </tr>
+                    `).join('');
+                }
+            });
     });
 }
 
@@ -2258,47 +2296,40 @@ function renderProjectsTable(programa, entidadNombre) {
 
 window.changeStage = function(stageNum) {
     currentStage = stageNum;
-    const containerId = (currentRole === 'admin') ? 'admin-tabs' : 'evaluador-tabs';
-    const container = document.getElementById(containerId);
-
-    // Si el contenedor no existe, no continuar
-    if (!container) {
-        console.warn(`Contenedor de tabs no encontrado: ${containerId}`);
-        return;
-    }
-
-    container.innerHTML = '';
-    
-    let etapasDisponibles = [1,2,3,4,5,6]; 
-    if (currentRole === 'evaluador') {
-        const match = allAsignacionesMapped.find(a => a.cobertura === currentCoverage);
-        etapasDisponibles = match ? match.etapas.sort((a, b) => a - b) : [1];
-    }
-
-    etapasDisponibles.forEach(i => {
-        const btn = document.createElement('button');
-        btn.className = `tab-button ${currentStage === i ? 'active' : ''}`;
-        btn.textContent = `Etapa ${i}`;
-        if (currentStage === i) {
-            btn.style.backgroundColor = `var(--bg-stage-${i})`;
-            btn.style.color = '#000';
-            btn.style.border = '1px solid var(--primary-dark)';
-        }
-        btn.onclick = () => window.changeStage(i);
-        container.appendChild(btn);
-    });
+    console.log('🔄 changeStage llamado:', stageNum, 'rol:', currentRole);
 
     if (currentRole === 'admin') {
+        const container = document.getElementById('admin-tabs');
+        if (!container) {
+            console.warn('Contenedor admin-tabs no encontrado');
+            return;
+        }
+        container.innerHTML = '';
+
+        let etapasDisponibles = [1,2,3,4,5,6];
+        etapasDisponibles.forEach(i => {
+            const btn = document.createElement('button');
+            btn.className = `tab-button ${currentStage === i ? 'active' : ''}`;
+            btn.textContent = `Etapa ${i}`;
+            if (currentStage === i) {
+                btn.style.backgroundColor = `var(--bg-stage-${i})`;
+                btn.style.color = '#000';
+                btn.style.border = '1px solid var(--primary-dark)';
+            }
+            btn.onclick = () => window.changeStage(i);
+            container.appendChild(btn);
+        });
+
         renderAdminView();
     } else {
         const tableCard = document.getElementById('table-card-container');
         if (tableCard) tableCard.style.backgroundColor = `var(--bg-stage-${currentStage})`;
-        
+
         // Actualizar scores desde el servidor en segundo plano (rápido y no bloquea)
         if (CLOUD_MODE_ENABLED && currentUser) {
             refreshScoresFromServer();
         }
-        
+
         loadScoresFromActiveContext();
         renderEvaluatorView();
     }
