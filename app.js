@@ -1044,7 +1044,7 @@ function parseSafeDate(isoString) {
 
 // NUEVA VERSIÓN V22: MÓDULO DE ASIGNACIONES HISTÓRICAS PERSISTENTES
 const DB_NAME = 'SistemaEvaluacionDB_v22';
-const DB_VERSION = 8; // Fuerza reinicialización de object stores en Chrome
+const DB_VERSION = 9; // Incrementado para forzar limpieza completa de IndexedDB corrupto
 
 document.addEventListener('DOMContentLoaded', () => {
     initIndexedDB(() => { setupEventListeners(); setupAdminTabs(); setupMatrixLogisticsDrivers(); checkDeadlineStatus(); });
@@ -1828,6 +1828,17 @@ function attemptEvaluatorLogin(evaluadores, userInput, passInput) {
         currentCoverage = allAsignacionesMapped[0].cobertura;
         const matchingConfig = allAsignacionesMapped.find(a => a.cobertura === currentCoverage);
         currentStage = matchingConfig ? matchingConfig.etapas[0] : 1;
+
+        // Detectar discrepancia: si hay asignaciones pero pocas entidades, sincronizar desde nube
+        if (allAsignacionesMapped.length > 1 && CLOUD_MODE_ENABLED) {
+            console.log('⚠️ Detectada posible desincronización - forzando sync desde nube');
+            cloudGet('asignaciones').then(cloudData => {
+                if (cloudData && cloudData.length > asignaciones.length) {
+                    console.log('🔄 Sincronizando asignaciones desde nube...');
+                    cloudSave('asignaciones', cloudData, 'replace');
+                }
+            });
+        }
 
         restoreConnectionStatus();
         showPanel('Sistema de Precalificación Técnica');
