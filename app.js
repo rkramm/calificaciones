@@ -3092,6 +3092,25 @@ function renderEvaluatorView() {
 
     const tbody = document.getElementById('evaluation-rows');
 
+    // Si no hay ítems cargados, intentar descargar desde la nube
+    if (dbItems.length === 0 && CLOUD_MODE_ENABLED) {
+        console.log('📥 Descargando ítems desde la nube...');
+        cloudGet('items').then(items => {
+            if (items && items.length > 0) {
+                dbItems = items.map(item => ({ ...item, stage: parseInt(item.stage, 10) || item.stage }));
+                console.log('✅ Ítems descargados:', dbItems.length);
+                renderEvaluatorView(); // Volver a renderizar con los datos
+            } else {
+                console.warn('⚠️ No hay ítems en el servidor');
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center">No hay criterios configurados en el servidor.</td></tr>`;
+            }
+        }).catch(err => {
+            console.error('❌ Error descargando ítems:', err);
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center">Error al cargar criterios.</td></tr>`;
+        });
+        return;
+    }
+
     // Obtener todos los ítems de la etapa actual, ordenados por id
     const stageItems = dbItems
         .filter(i => parseInt(i.stage, 10) === parseInt(currentStage, 10))
