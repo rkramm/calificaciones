@@ -346,13 +346,15 @@ const serverVersions = {};
 
 async function cloudGet(table) {
     try {
-        // Agregar timeout de 15 segundos
+        // Agregar timeout de 30 segundos (Google Sheets puede ser lento)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         // Agregamos &t=Date.now() para forzar al navegador a ignorar el caché y obtener la info fresca real
         const response = await fetch(`${GOOGLE_SCRIPT_URL}?table=${table}&t=${Date.now()}`, {
-            signal: controller.signal
+            signal: controller.signal,
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
         });
 
         clearTimeout(timeoutId);
@@ -370,7 +372,7 @@ async function cloudGet(table) {
     } catch (error) {
         console.error(`Error leyendo tabla ${table} desde el servidor:`, error);
         if (error.name === 'AbortError') {
-            console.error(`⏱️ Timeout: Google Sheets tardó más de 15 segundos para ${table}`);
+            console.error(`⏱️ Timeout: Google Sheets tardó más de 30 segundos para ${table}`);
         }
         return null;
     }
@@ -1040,11 +1042,13 @@ function downloadHistoricosFromCloud() {
     if (!confirmed) return;
 
     showProgressBar('Descargando asignaciones desde la Nube...');
+    console.log('🔗 Conectando a Google Sheets:', GOOGLE_SCRIPT_URL);
 
     const timeoutPromise = new Promise((resolve) => {
         setTimeout(() => {
+            console.warn('⏱️ Se alcanzó el timeout de 40 segundos');
             resolve(null);
-        }, 20000); // 20 segundos de timeout
+        }, 40000); // 40 segundos de timeout (permite que cloudGet termine primero)
     });
 
     Promise.race([cloudGet('asignaciones'), timeoutPromise]).then(asignaciones => {
@@ -1052,8 +1056,8 @@ function downloadHistoricosFromCloud() {
 
         if (asignaciones === null) {
             hideProgressBar();
-            alert('⏱️ TIMEOUT: Google Sheets tardó demasiado en responder.\n\nVerifique su conexión a internet o intente nuevamente.\n\nSe está usando el caché local si está disponible.');
-            console.warn('Timeout descargando asignaciones');
+            console.warn('⏱️ Timeout o error descargando asignaciones');
+            alert('No se pudo conectar con Google Sheets.\n\nVerifique su conexión a internet.\n\nSe está usando el caché local si está disponible.');
             return;
         }
 
