@@ -3874,9 +3874,20 @@ if (!document.getElementById('toast-styles')) {
 
 function loadScoresFromActiveContext() {
     dbScores = {};
-    allMemoryScores.filter(r => r.cobertura === currentCoverage && r.stage === currentStage).forEach(r => {
+    const filteredScores = allMemoryScores.filter(r => r.cobertura === currentCoverage && r.stage === currentStage);
+
+    console.log(`🔍 loadScoresFromActiveContext:`);
+    console.log(`   - Cobertura actual: ${currentCoverage}`);
+    console.log(`   - Etapa actual: ${currentStage}`);
+    console.log(`   - Total scores en memoria: ${allMemoryScores.length}`);
+    console.log(`   - Scores filtrados: ${filteredScores.length}`);
+
+    filteredScores.forEach(r => {
         dbScores[r.itemId] = r.score;
+        console.log(`   📌 itemId: "${r.itemId}" (tipo: ${typeof r.itemId}) = score: ${r.score}`);
     });
+
+    console.log(`   📊 dbScores final:`, dbScores);
 }
 
 function renderEvaluatorView() {
@@ -3909,8 +3920,11 @@ function renderEvaluatorView() {
         return;
     }
 
-    const rowsHtml = stageItems.map(item => {
+    const rowsHtml = stageItems.map((item, idx) => {
         const score = dbScores[item.id] !== undefined ? dbScores[item.id] : "";
+        if (idx < 3) {
+            console.log(`📋 Item: "${item.id}" (tipo: ${typeof item.id}) → score: ${score} (de dbScores: ${dbScores[item.id]})`);
+        }
         return `
             <tr>
                 <td class="cell-index bold-text">${item.id}</td>
