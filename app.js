@@ -2157,17 +2157,22 @@ function loadEvaluatorWithAsignaciones(userAsignaciones) {
             console.log(`📊 Total de scores en Google Sheets: ${cloudScores.length}`);
             console.log(`🔍 Buscando scores para rutEvaluador: "${currentUser.rut}"`);
 
-            userScoresFromCloud = cloudScores.filter(s => s.rutEvaluador === currentUser.rut);
+            userScoresFromCloud = cloudScores.filter(s => s.rutEvaluador === currentUser.rut).map(s => ({
+                ...s,
+                stage: parseInt(s.stage, 10),  // Convertir stage a número
+                score: parseInt(s.score, 10)   // Convertir score a número
+            }));
 
             console.log(`✅ Descargados ${userScoresFromCloud.length} scores para ${currentUser.rut}`);
             if (userScoresFromCloud.length > 0) {
-                console.log(`📋 Primeros 3 scores COMPLETOS:`, userScoresFromCloud.slice(0, 3));
+                console.log(`📋 Primeros 3 scores (CONVERTIDOS):`, userScoresFromCloud.slice(0, 3));
                 console.log(`   📌 Ejemplo score[0]:`, {
                     cobertura: userScoresFromCloud[0].cobertura,
                     stage: userScoresFromCloud[0].stage,
+                    stageType: typeof userScoresFromCloud[0].stage,
                     itemId: userScoresFromCloud[0].itemId,
                     score: userScoresFromCloud[0].score,
-                    stageType: typeof userScoresFromCloud[0].stage
+                    scoreType: typeof userScoresFromCloud[0].score
                 });
             }
         } else {
