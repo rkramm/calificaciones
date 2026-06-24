@@ -2373,7 +2373,13 @@ function backgroundSyncForEvaluator() {
                 // Combinar: primero los del servidor, luego los locales que no están en el servidor
                 const serverIds = new Set(serverScores.map(s => s.idTx));
                 const localOnlyScores = localScores.filter(s => !serverIds.has(s.idTx));
-                const combinedScores = [...serverScores, ...localOnlyScores];
+                // 🔧 CRÍTICO: Convertir stage y score a números (Google Sheets retorna strings)
+                const convertedServerScores = serverScores.map(s => ({
+                    ...s,
+                    stage: parseInt(s.stage, 10),
+                    score: parseInt(s.score, 10)
+                }));
+                const combinedScores = [...convertedServerScores, ...localOnlyScores];
 
                 // Guardar combinación en IndexedDB
                 const tx = dbInstance.transaction(['scores'], 'readwrite');
@@ -2999,11 +3005,17 @@ function refreshScoresFromServer() {
         
         // Filtrar solo los scores del evaluador actual
         const myRemoteScores = remoteScores.filter(r => r.rutEvaluador === currentUser.rut);
-        
+
         // Combinar con datos locales que no estén en el servidor
         const remoteIds = new Set(myRemoteScores.map(s => s.idTx));
         const localOnly = allMemoryScores.filter(s => !remoteIds.has(s.idTx));
-        const updatedScores = [...myRemoteScores, ...localOnly];
+        // 🔧 CRÍTICO: Convertir stage y score a números (Google Sheets retorna strings)
+        const convertedRemoteScores = myRemoteScores.map(s => ({
+            ...s,
+            stage: parseInt(s.stage, 10),
+            score: parseInt(s.score, 10)
+        }));
+        const updatedScores = [...convertedRemoteScores, ...localOnly];
         
         // Actualizar IndexedDB
         const tx = dbInstance.transaction(['scores'], 'readwrite');
