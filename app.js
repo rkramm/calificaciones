@@ -2173,7 +2173,10 @@ function renderCoverageTabs() {
         btn.onclick = () => {
             currentCoverage = cobertura;
             const badgeEl = document.getElementById('eval-programa-badge');
-            if (badgeEl) badgeEl.textContent = currentCoverage;
+            if (badgeEl) {
+                const programa = cobertura ? cobertura.split(' - ')[0] : 'DS10';
+                badgeEl.textContent = programa;
+            }
             const conf = allAsignacionesMapped.find(a => a.cobertura === currentCoverage);
             currentStage = (conf && conf.etapas && conf.etapas.length > 0) ? conf.etapas[0] : 1;
             // Resetear entidad seleccionada para que se auto-seleccione la primera del nuevo programa
@@ -2261,10 +2264,11 @@ function renderEvaluatorHeaderInfo() {
         programaEl.textContent = programas || '---';
     }
 
-    // Actualizar badge de cobertura
+    // Actualizar badge de cobertura (solo mostrar código, no provincia)
     const badgeEl = document.getElementById('eval-programa-badge');
     if (badgeEl) {
-        badgeEl.textContent = currentCoverage || 'DS10';
+        const programa = currentCoverage ? currentCoverage.split(' - ')[0] : 'DS10';
+        badgeEl.textContent = programa;
     }
 
     // Intentar buscar datos adicionales en IndexedDB EN SEGUNDO PLANO (sin bloquear)
