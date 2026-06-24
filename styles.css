@@ -370,3 +370,13 @@ button { font-family: 'Segoe UI', sans-serif; }
     .login-card { padding: 30px 20px; max-width: 90%; }
     .login-header h2 { font-size: 1.4rem; }
 }
+
+/* ================= SIDEBAR COLAPSABLE ================= */
+.eval-sidebar-expanded {
+    width: 220px !important;
+}
+
+.eval-sidebar-collapsed {
+    width: 0 !important;
+    visibility: hidden !important;
+}

@@ -1244,6 +1244,29 @@ function setupEventListeners() {
 
     const inputRestoreBackup = document.getElementById('input-restore-backup');
     if (inputRestoreBackup) inputRestoreBackup.addEventListener('change', handleRestoreBackupJSON);
+
+    const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+    if (btnToggleSidebar) btnToggleSidebar.addEventListener('click', toggleEvalSidebar);
+}
+
+/**
+ * Toggle para colapsar/expandir sidebar de entidades
+ */
+function toggleEvalSidebar() {
+    const sidebar = document.getElementById('eval-sidebar');
+    const btn = document.getElementById('btn-toggle-sidebar');
+
+    if (!sidebar || !btn) return;
+
+    if (sidebar.classList.contains('eval-sidebar-expanded')) {
+        sidebar.classList.remove('eval-sidebar-expanded');
+        sidebar.classList.add('eval-sidebar-collapsed');
+        btn.textContent = '▶';
+    } else {
+        sidebar.classList.remove('eval-sidebar-collapsed');
+        sidebar.classList.add('eval-sidebar-expanded');
+        btn.textContent = '◀';
+    }
 }
 
 let historicoEntidadesAsignadas = [];
