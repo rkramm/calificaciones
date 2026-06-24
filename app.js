@@ -1423,14 +1423,20 @@ window.deleteAsignacionWithOptions = function(rut, nombre, cobertura, stageNum, 
                 return;
             }
 
-            const tx = dbInstance.transaction(['asignaciones'], 'readwrite');
-            tx.objectStore('asignaciones').delete(idAsig);
-            tx.oncomplete = () => {
-                alert(`✅ Asignación de ${nombre} eliminada completamente`);
-                deleteAsignacionFromGoogleSheets(asig);
-                renderMonitoringTable();
-                populateAdminMatrix();
-            };
+            // Primero eliminar del datasheet de Google
+            deleteAsignacionFromGoogleSheets(asig).then(() => {
+                // Luego eliminar localmente
+                const tx = dbInstance.transaction(['asignaciones'], 'readwrite');
+                tx.objectStore('asignaciones').delete(idAsig);
+                tx.oncomplete = () => {
+                    alert(`✅ Asignación de ${nombre} eliminada completamente`);
+                    renderMonitoringTable();
+                    populateAdminMatrix();
+                };
+            }).catch(err => {
+                console.error('Error en eliminación:', err);
+                alert('Error al eliminar: ' + err.message);
+            });
         });
     } else {
         alert('Opción no válida');
@@ -1458,32 +1464,41 @@ async function syncAsignacionesToGoogleSheets(asignacion) {
 /**
  * Elimina una asignación de Google Sheets
  */
-async function deleteAsignacionFromGoogleSheets(asignacion) {
-    try {
-        // Enviar la asignación marcada para eliminación
-        const result = await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-                action: 'deleteRow',
+function deleteAsignacionFromGoogleSheets(asignacion) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // Crear un payload para eliminar la fila específica del datasheet
+            const deletePayload = {
+                action: 'deleteAsignacion',
                 table: 'asignaciones',
-                keyField: 'idAsig',
-                keyValue: asignacion.idAsig,
+                idAsig: asignacion.idAsig,
+                rut: asignacion.rut,
+                cobertura: asignacion.cobertura,
                 clientVersion: serverVersions['asignaciones'] || 0,
                 mode: 'prod'
-            })
-        });
-        const response = await result.json();
-        if (response.success) {
-            console.log('✅ Asignación eliminada de Google Sheets');
-        } else {
-            console.error('Error al eliminar:', response.error);
-            alert('⚠️ Error al eliminar de Google Sheets: ' + (response.error || 'Error desconocido'));
+            };
+
+            console.log('📤 Eliminando asignación de Google Sheets:', deletePayload);
+
+            const response = await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(deletePayload)
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                console.log('✅ Asignación eliminada de Google Sheets');
+                resolve(result);
+            } else {
+                console.error('Error al eliminar:', result.error);
+                resolve(result); // Resolver de todas formas para continuar con eliminación local
+            }
+        } catch (error) {
+            console.error('Error en eliminación:', error);
+            resolve({ success: false }); // Resolver de todas formas
         }
-    } catch (error) {
-        console.error('Error en eliminación:', error);
-        alert('⚠️ Error en eliminación: ' + error.message);
-    }
+    });
 }
 
 function setupAdminTabs() {
