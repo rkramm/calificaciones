@@ -2499,16 +2499,25 @@ function renderProjectsTableAllPrograms(asignaciones, entidadNombre) {
                             `;
                         }
 
-                        body.innerHTML = todosLosProyectos.map(p => `
+                        body.innerHTML = todosLosProyectos.map(p => {
+                            let familias = '';
+                            const keysWithFam = Object.keys(p).find(k => k.toLowerCase().includes('familia') || k.toLowerCase().includes('fam') || k.includes('°'));
+                            if (keysWithFam) {
+                                familias = p[keysWithFam];
+                            } else {
+                                familias = p['N°Familias'] || p['N° Familias'] || p['N°familias'] || p['Familias'] || p['familias'] || p.Nfamilias || p.familias || '';
+                            }
+                            return `
                             <tr>
                                 <td>${p['Codigo Proyecto'] || p.codigo || p.Codigo || ''}</td>
                                 <td>${p['NOMBRE PROYECTO'] || p['Nombre Proyecto'] || p['Nombre del proy'] || p.nombre_proyecto || p.Nombre || p.nombre || ''}</td>
                                 <td>${p.COMUNA || p.Comuna || p.comuna || ''}</td>
                                 <td>${p.Tipología || p.tipologia || p.Tipologia || ''}</td>
-                                <td>${p['N°Familias'] || p['N°familias'] || p.Familias || p.Nfamilias || p.familias || ''}</td>
+                                <td>${familias}</td>
                                 <td>${p.año || p.Año || p.ano || p.anio || ''}</td>
                             </tr>
-                        `).join('');
+                        `;
+                        }).join('');
                     } else {
                         // Para mezcla: 6 columnas (Código, Nombre, Comuna, Modal., Familias, Año)
                         if (thead) {
