@@ -1837,6 +1837,10 @@ function loadEvaluatorWithAsignaciones(userAsignaciones) {
         } else if (!Array.isArray(parsedEtapas)) {
             parsedEtapas = [1];
         }
+        // Garantizar que siempre haya al menos una etapa válida
+        if (!Array.isArray(parsedEtapas) || parsedEtapas.length === 0) {
+            parsedEtapas = [1];
+        }
         return {
             cobertura: `${a.programa} - ${a.provincia.toUpperCase()}`,
             etapas: parsedEtapas.sort((x, y) => x - y),
@@ -1852,7 +1856,7 @@ function loadEvaluatorWithAsignaciones(userAsignaciones) {
 
         currentCoverage = allAsignacionesMapped[0].cobertura;
         const matchingConfig = allAsignacionesMapped.find(a => a.cobertura === currentCoverage);
-        currentStage = matchingConfig ? matchingConfig.etapas[0] : 1;
+        currentStage = (matchingConfig && matchingConfig.etapas && matchingConfig.etapas.length > 0) ? matchingConfig.etapas[0] : 1;
 
         // 🚀 MOSTRAR LA UI INMEDIATAMENTE (sin esperar proyectos)
         restoreConnectionStatus();
@@ -2053,7 +2057,7 @@ function renderCoverageTabs() {
         btn.onclick = () => {
             currentCoverage = cobertura;
             const conf = allAsignacionesMapped.find(a => a.cobertura === currentCoverage);
-            currentStage = conf ? conf.etapas[0] : 1;
+            currentStage = (conf && conf.etapas && conf.etapas.length > 0) ? conf.etapas[0] : 1;
             // Resetear entidad seleccionada para que se auto-seleccione la primera del nuevo programa
             window.currentSelectedEntity = null;
             renderCoverageTabs();
