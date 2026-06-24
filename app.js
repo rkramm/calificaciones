@@ -2287,42 +2287,55 @@ function backgroundSyncForEvaluator() {
     // Cargar scores del usuario desde Google Sheets en segundo plano
     console.log(`📥 Descargando scores para ${currentUser.rut}...`);
 
-    cloudGet('scores').then(cloudScores => {
+    // Timeout agresivo: si tarda más de 12 segundos, usar datos locales
+    const timeoutPromise = new Promise((resolve) => {
+        setTimeout(() => {
+            console.warn('⏱️ Timeout descargando scores, usando caché local');
+            resolve(null);
+        }, 12000);
+    });
+
+    Promise.race([cloudGet('scores'), timeoutPromise]).then(cloudScores => {
         if (cloudScores && Array.isArray(cloudScores)) {
             // Filtrar scores del usuario actual desde Google Sheets
             const serverScores = cloudScores.filter(s => s.rutEvaluador === currentUser.rut);
             console.log(`✅ Se encontraron ${serverScores.length} scores en Google Sheets para ${currentUser.rut}`);
 
-            // Obtener scores locales actuales (ya cargados en allMemoryScores)
-            const localScores = allMemoryScores || [];
+            if (serverScores.length > 0) {
+                // Obtener scores locales actuales (ya cargados en allMemoryScores)
+                const localScores = allMemoryScores || [];
 
-            // Combinar: primero los del servidor, luego los locales que no están en el servidor
-            const serverIds = new Set(serverScores.map(s => s.idTx));
-            const localOnlyScores = localScores.filter(s => !serverIds.has(s.idTx));
-            const combinedScores = [...serverScores, ...localOnlyScores];
+                // Combinar: primero los del servidor, luego los locales que no están en el servidor
+                const serverIds = new Set(serverScores.map(s => s.idTx));
+                const localOnlyScores = localScores.filter(s => !serverIds.has(s.idTx));
+                const combinedScores = [...serverScores, ...localOnlyScores];
 
-            // Guardar combinación en IndexedDB
-            const tx = dbInstance.transaction(['scores'], 'readwrite');
-            const store = tx.objectStore('scores');
-            combinedScores.forEach(s => store.put(s));
+                // Guardar combinación en IndexedDB
+                const tx = dbInstance.transaction(['scores'], 'readwrite');
+                const store = tx.objectStore('scores');
+                combinedScores.forEach(s => store.put(s));
 
-            tx.oncomplete = () => {
-                allMemoryScores = combinedScores;
+                tx.oncomplete = () => {
+                    allMemoryScores = combinedScores;
+                    loadScoresFromActiveContext();
+                    renderEvaluatorView();
+                    console.log(`✅ Scores sincronizados: ${combinedScores.length} registros totales`);
+                    showToast('✅ Puntuaciones sincronizadas', 'success');
+                };
+            } else {
+                console.log(`⚠️ No hay scores en Google Sheets para ${currentUser.rut}`);
                 loadScoresFromActiveContext();
                 renderEvaluatorView();
-                console.log(`✅ Scores sincronizados: ${combinedScores.length} registros totales`);
-                showToast('✅ Puntuaciones sincronizadas', 'success');
-            };
+            }
         } else {
-            console.log(`⚠️ No hay scores en Google Sheets para ${currentUser.rut}`);
-            // Mantener scores locales sin cambios
+            console.log(`⚠️ No hay scores disponibles, usando caché local`);
+            // Ya tenemos scores en allMemoryScores desde loadEvaluatorWithAsignaciones
             loadScoresFromActiveContext();
             renderEvaluatorView();
         }
     }).catch(err => {
-        console.log('⚠️ Error descargando scores desde Google Sheets, usando caché local:', err);
-        // Ya tenemos scores en allMemoryScores desde loadEvaluatorWithAsignaciones
-        // Solo re-renderizar si es necesario
+        console.error('❌ Error descargando scores:', err);
+        // Fallback: usar datos locales que ya están en allMemoryScores
         loadScoresFromActiveContext();
         renderEvaluatorView();
     });
@@ -2474,8 +2487,8 @@ function renderEvaluatorHeaderInfo() {
         });
     }
 
-    // Buscar TODAS las asignaciones para la entidad seleccionada
-    const asignsForEntity = allAsignacionesMapped.filter(a =>
+    // Buscar asignaciones para la entidad seleccionada EN LA COBERTURA ACTUAL (no todas las coberturas)
+    const asignsForEntity = allCoverageAsigs.filter(a =>
         a.entidadNombre === window.currentSelectedEntity
     );
 
