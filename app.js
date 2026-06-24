@@ -2147,17 +2147,10 @@ function loadEvaluatorWithAsignaciones(userAsignaciones) {
         };
     }).sort((a, b) => a.cobertura.localeCompare(b.cobertura));
 
-    // 🔄 PRIORIDAD 1: DESCARGAR SCORES DE GOOGLE SHEETS (con timeout agresivo)
+    // 🔄 PRIORIDAD 1: DESCARGAR SCORES DE GOOGLE SHEETS
     console.log(`📥 Intentando descargar scores para ${currentUser.rut} desde Google Sheets...`);
 
-    const scoresTimeoutPromise = new Promise((resolve) => {
-        setTimeout(() => {
-            console.warn('⏱️ Timeout descargando scores (10s), usando caché local');
-            resolve(null);
-        }, 10000);
-    });
-
-    Promise.race([cloudGet('scores'), scoresTimeoutPromise]).then(cloudScores => {
+    cloudGet('scores').then(cloudScores => {
         // Filtrar scores del evaluador desde Google Sheets
         let userScoresFromCloud = [];
         if (cloudScores && Array.isArray(cloudScores)) {
@@ -2971,9 +2964,12 @@ window.changeStage = function(stageNum) {
         loadScoresFromActiveContext();
 
         // Volver a renderizar los badges de etapas para actualizar cuál está activo
-        const asignsForCurrentCoverage = allAsignacionesMapped.filter(a => a.cobertura === currentCoverage);
-        if (asignsForCurrentCoverage.length > 0) {
-            renderStagesForEvaluator(asignsForCurrentCoverage);
+        // IMPORTANTE: Filtrar por COBERTURA ACTUAL y ENTIDAD ACTUAL (no mostrar etapas de otras entidades)
+        const asignsForCurrentCoveragAndEntity = allAsignacionesMapped.filter(a =>
+            a.cobertura === currentCoverage && a.entidadNombre === window.currentSelectedEntity
+        );
+        if (asignsForCurrentCoveragAndEntity.length > 0) {
+            renderStagesForEvaluator(asignsForCurrentCoveragAndEntity);
         }
 
         renderEvaluatorView();
