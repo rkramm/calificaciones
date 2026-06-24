@@ -2607,6 +2607,13 @@ window.changeStage = function(stageNum) {
         }
 
         loadScoresFromActiveContext();
+
+        // Volver a renderizar los badges de etapas para actualizar cuál está activo
+        const asignsForCurrentCoverage = allAsignacionesMapped.filter(a => a.cobertura === currentCoverage);
+        if (asignsForCurrentCoverage.length > 0) {
+            renderStagesForEvaluator(asignsForCurrentCoverage);
+        }
+
         renderEvaluatorView();
     }
 };
