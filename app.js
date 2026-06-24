@@ -2332,10 +2332,10 @@ function renderProjectsTableAllPrograms(asignaciones, entidadNombre) {
                         body.innerHTML = todosLosProyectos.map(p => `
                             <tr>
                                 <td>${p['Codigo Proyecto'] || p.codigo || p.Codigo || ''}</td>
-                                <td>${p['Nombre del proy'] || p['Nombre Proyecto'] || p.nombre_proyecto || p.Nombre || ''}</td>
-                                <td>${p.Comuna || p.comuna || ''}</td>
+                                <td>${p['Nombre Proyecto'] || p['Nombre del proy'] || p.nombre_proyecto || p.Nombre || ''}</td>
+                                <td>${p.COMUNA || p.Comuna || p.comuna || ''}</td>
                                 <td>${p.Tipología || p.tipologia || p.Tipologia || ''}</td>
-                                <td>${p.Año || p.ano || p.anio || ''}</td>
+                                <td>${p.año || p.Año || p.ano || p.anio || ''}</td>
                             </tr>
                         `).join('');
                     } else {
