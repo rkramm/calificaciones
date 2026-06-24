@@ -2161,10 +2161,17 @@ function loadEvaluatorWithAsignaciones(userAsignaciones) {
         // Filtrar scores del evaluador desde Google Sheets
         let userScoresFromCloud = [];
         if (cloudScores && Array.isArray(cloudScores)) {
+            console.log(`📊 Total de scores en Google Sheets: ${cloudScores.length}`);
+            console.log(`🔍 Buscando scores para rutEvaluador: "${currentUser.rut}"`);
+
             userScoresFromCloud = cloudScores.filter(s => s.rutEvaluador === currentUser.rut);
-            console.log(`✅ Descargados ${userScoresFromCloud.length} scores de Google Sheets para ${currentUser.rut}`);
+
+            console.log(`✅ Descargados ${userScoresFromCloud.length} scores para ${currentUser.rut}`);
+            if (userScoresFromCloud.length > 0) {
+                console.log(`📋 Primeros 3 scores:`, userScoresFromCloud.slice(0, 3));
+            }
         } else {
-            console.log(`ℹ️ Sin scores en Google Sheets, usando IndexedDB`);
+            console.log(`ℹ️ Sin scores en Google Sheets (null o no es array), usando IndexedDB`);
         }
 
         // Si hay scores en Google Sheets, usarlos; si no, leer de IndexedDB
