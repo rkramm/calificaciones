@@ -2621,6 +2621,10 @@ function renderEvaluatorHeaderInfo() {
 
     // Renderizar etapas a calificar (TODAS las asignadas para esta entidad)
     renderStagesForEvaluator(asignsForEntity);
+
+    // 🔄 CARGAR SCORES PARA LA ETAPA ACTUAL (IMPORTANTE: se hace después de cambiar entidad)
+    loadScoresFromActiveContext();
+    renderEvaluatorView();
 }
 
 /**
