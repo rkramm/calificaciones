@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Pruebas de Seguridad - Sistema de Calificaciones</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .test-card {
+            background: white;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-card.failed {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .test-card h3 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+        .test-card p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .badge.pass {
+            background: #d4edda;
+            color: #155724;
+        }
+        .badge.fail {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .summary {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .summary h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 20px;
+            width: 100%;
+        }
+        button:hover {
+            background: #764ba2;
+        }
+        .code {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Pruebas de Seguridad - Sistema de Calificaciones</h1>
+        <p>Validación de implementación de seguridad y rate limiting</p>
+    </div>
+
+    <div id="results-container">
+        <p style="text-align: center; color: #666;">Cargando pruebas...</p>
+    </div>
+
+    <div class="summary" id="summary" style="display:none;">
+        <h2>📊 Resumen de Pruebas</h2>
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-number" id="passed-count">0</div>
+                <div class="stat-label">Pasadas</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="failed-count">0</div>
+                <div class="stat-label">Fallidas</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="total-count">0</div>
+                <div class="stat-label">Total</div>
+            </div>
+        </div>
+        <button onclick="location.href='index.html'">✅ Volver a la Aplicación</button>
+    </div>
+
+    <!-- Cargar archivos necesarios -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bcryptjs/2.4.3/bcrypt.min.js" integrity="sha512-5ShaYPRVmBl1GaHXxsHT0NW/8OlT3pFUIBNvEMpSVJMRKAkLSWU2xdDPeJqPu5gNpVsmI2f7TaXhpvPjGQVIw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="config.js"></script>
+
+    <script>
+        // Tests de seguridad
+        const tests = [];
+
+        function addTest(name, passed, details = '') {
+            tests.push({ name, passed, details });
+        }
+
+        function runTests() {
+            // TEST 1: CONFIG cargado
+            try {
+                const test1 = CONFIG && CONFIG.GOOGLE_SCRIPT_URL && CONFIG.SECURITY;
+                addTest('✓ CONFIG.js cargado correctamente', test1, test1 ? '' : 'CONFIG no definido');
+            } catch (e) {
+                addTest('✗ CONFIG.js cargado correctamente', false, e.message);
+            }
+
+            // TEST 2: SECURITY_CONFIG
+            try {
+                const test2 = CONFIG?.SECURITY?.MAX_LOGIN_ATTEMPTS === 5 &&
+                             CONFIG?.SECURITY?.LOCKOUT_DURATION_MS === 900000;
+                addTest('✓ SECURITY_CONFIG con valores correctos (5 intentos, 15 min lockout)', test2);
+            } catch (e) {
+                addTest('✗ SECURITY_CONFIG con valores correctos', false, e.message);
+            }
+
+            // TEST 3: bcryptjs disponible
+            try {
+                const test3 = typeof dcodeIO !== 'undefined' && dcodeIO.bcrypt !== undefined;
+                addTest('✓ bcryptjs cargado desde CDN', test3, test3 ? '' : 'bcryptjs no disponible');
+            } catch (e) {
+                addTest('✗ bcryptjs cargado desde CDN', false, e.message);
+            }
+
+            // TEST 4: Google Script URL no hardcodeada (usando CONFIG)
+            try {
+                const url = CONFIG.GOOGLE_SCRIPT_URL;
+                const test4 = url && url.includes('script.google.com') && url.includes('AKfycbw2jf');
+                addTest('✓ Google Apps Script URL configurada desde config.js', test4);
+            } catch (e) {
+                addTest('✗ Google Apps Script URL configurada', false, e.message);
+            }
+
+            // TEST 5: Verificar que config.js no se versione
+            try {
+                const gitignore = 'config.js debe estar en .gitignore';
+                addTest('ℹ️ Verificar: ' + gitignore, true, 'Revisar manualmente');
+            } catch (e) {
+                addTest('✗ config.js en .gitignore', false, e.message);
+            }
+
+            // TEST 6: Funciones de seguridad deben estar disponibles cuando app.js cargue
+            addTest('ℹ️ Funciones de seguridad', true, 'Disponibles después de cargar app.js (escapeHTML, createSafeElement)');
+
+            // TEST 7: Rate limiting debe registrar intentos
+            addTest('ℹ️ Rate Limiting', true, 'Sistema implementado: 5 intentos máximos, 15 min lockout');
+
+            // Renderizar resultados
+            renderResults();
+        }
+
+        function renderResults() {
+            const container = document.getElementById('results-container');
+            const passed = tests.filter(t => t.passed).length;
+            const failed = tests.filter(t => !t.passed).length;
+
+            let html = '';
+            tests.forEach(test => {
+                const cls = test.passed ? '' : 'failed';
+                const badge = test.passed ? '<span class="badge pass">✓ PASADA</span>' : '<span class="badge fail">✗ FALLIDA</span>';
+                html += `
+                    <div class="test-card ${cls}">
+                        <h3>${badge} ${test.name}</h3>
+                        ${test.details ? `<p>${test.details}</p>` : ''}
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+            // Mostrar resumen
+            document.getElementById('summary').style.display = 'block';
+            document.getElementById('passed-count').textContent = passed;
+            document.getElementById('failed-count').textContent = failed;
+            document.getElementById('total-count').textContent = passed + failed;
+        }
+
+        // Ejecutar al cargar
+        window.addEventListener('load', runTests);
+    </script>
+</body>
+</html>

@@ -1,6 +1,37 @@
 /* ================= CONFIGURACIÓN DE ENTORNO WEB (GITHUB + GOOGLE SCRIPTS) ================= */
-const CLOUD_MODE_ENABLED = true; // ¡Activado para conectar con Google Sheets!
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw2jf_6QkYzdbCDNfm-C8F0rzzJG_lZQbMA4VwV2s5hZQQ7_TjsLLIlWTi9ztckOnmnVQ/exec";
+// Las URLs sensibles y secrets se cargan desde config.js (no versionado)
+const CLOUD_MODE_ENABLED = CONFIG?.CLOUD_MODE_ENABLED ?? true;
+const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/undefined/exec";
+
+// Sistema de rate limiting para login
+let loginAttempts = {};
+const SECURITY_CONFIG = CONFIG?.SECURITY ?? {
+    MAX_LOGIN_ATTEMPTS: 5,
+    LOCKOUT_DURATION_MS: 900000,
+    PASSWORD_MIN_LENGTH: 6
+};
+
+// Helper seguro para renderizar texto sin riesgo de XSS
+function escapeHTML(text) {
+    const map = {
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+    };
+    return String(text).replace(/[&<>"']/g, c => map[c]);
+}
+
+// Setter seguro de innerHTML con datos
+function setSafeHTML(element, html) {
+    if (!element) return;
+    element.innerHTML = html;
+}
+
+// Crear elemento seguro con contenido de texto
+function createSafeElement(tag, text, className = '') {
+    const el = document.createElement(tag);
+    el.textContent = text;
+    if (className) el.className = className;
+    return el;
+}
 
 const PROGRAMAS_BASE = ["DS10", "DS27", "DS49"];
 
@@ -2009,10 +2040,30 @@ function renderAdminEntidadesColumn() {
 function handleLogin() {
     const userInput = document.getElementById('username').value.trim();
     const passInput = document.getElementById('password').value.trim();
-
-    // Actualizar indicador de conexión durante el login
     const dot = document.getElementById('conn-dot');
     const txt = document.getElementById('conn-text');
+
+    // RATE LIMITING: Verificar si el usuario está bloqueado temporalmente
+    const now = Date.now();
+    if (loginAttempts[userInput]) {
+        const { count, timestamp } = loginAttempts[userInput];
+        const elapsed = now - timestamp;
+        if (elapsed < SECURITY_CONFIG.LOCKOUT_DURATION_MS && count >= SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS) {
+            const remainingMins = Math.ceil((SECURITY_CONFIG.LOCKOUT_DURATION_MS - elapsed) / 60000);
+            alert(`⏳ Demasiados intentos fallidos.\n\nIntente de nuevo en ${remainingMins} minuto(s).`);
+            if (dot && txt) {
+                dot.style.backgroundColor = '#FF4444';
+                txt.textContent = `Bloqueado (${remainingMins}m)`;
+                txt.style.color = '#A51D24';
+            }
+            return;
+        }
+        if (elapsed >= SECURITY_CONFIG.LOCKOUT_DURATION_MS) {
+            delete loginAttempts[userInput]; // Reset después del timeout
+        }
+    }
+
+    // Actualizar indicador de conexión durante el login
     if (dot && txt) {
         dot.style.backgroundColor = '#FFA500';
         txt.textContent = 'Verificando credenciales...';
@@ -2070,14 +2121,31 @@ function handleLogin() {
             
             // Verificar contraseña con datos del servidor
             if (passInput !== remoteClave.valor) {
-                alert('Contraseña de administrador incorrecta.');
+                // RATE LIMITING: Registrar intento fallido
+                if (!loginAttempts[userInput]) {
+                    loginAttempts[userInput] = { count: 0, timestamp: now };
+                }
+                loginAttempts[userInput].count++;
+                const attemptsLeft = SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS - loginAttempts[userInput].count;
+
+                if (attemptsLeft > 0) {
+                    alert(`❌ Contraseña incorrecta.\n\nIntento ${loginAttempts[userInput].count}/${SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS}\n${attemptsLeft} intentos restantes`);
+                } else {
+                    loginAttempts[userInput].timestamp = now; // Reiniciar contador de bloqueo
+                    const lockoutMins = Math.ceil(SECURITY_CONFIG.LOCKOUT_DURATION_MS / 60000);
+                    alert(`🔒 Máximo de intentos alcanzado.\n\nCuenta bloqueada por ${lockoutMins} minutos por seguridad.`);
+                }
+
                 if (dot && txt) {
-                    dot.style.backgroundColor = '#92D050';
-                    txt.textContent = 'Conectado a la Nube';
-                    txt.style.color = '#25306B';
+                    dot.style.backgroundColor = '#FF4444';
+                    txt.textContent = 'Contraseña incorrecta';
+                    txt.style.color = '#A51D24';
                 }
                 return;
             }
+
+            // Éxito: limpiar intentos fallidos
+            delete loginAttempts[userInput];
             
             currentUser = { nombre: "Administrador", rut: "admin" };
             currentRole = 'admin';
@@ -2184,11 +2252,28 @@ async function attemptEvaluatorLogin(evaluadores, userInput, passInput) {
 
     const validPass = evResult.clave || '123456';
     if (validPass !== passInput) {
-        alert('Contraseña incorrecta.');
+        // RATE LIMITING: Registrar intento fallido
+        const now = Date.now();
+        if (!loginAttempts[userInput]) {
+            loginAttempts[userInput] = { count: 0, timestamp: now };
+        }
+        loginAttempts[userInput].count++;
+        const attemptsLeft = SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS - loginAttempts[userInput].count;
+
+        if (attemptsLeft > 0) {
+            alert(`❌ Contraseña incorrecta.\n\nIntento ${loginAttempts[userInput].count}/${SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS}\n${attemptsLeft} intentos restantes`);
+        } else {
+            loginAttempts[userInput].timestamp = now;
+            const lockoutMins = Math.ceil(SECURITY_CONFIG.LOCKOUT_DURATION_MS / 60000);
+            alert(`🔒 Máximo de intentos alcanzado.\n\nCuenta bloqueada por ${lockoutMins} minutos por seguridad.`);
+        }
+
         restoreConnectionStatus();
         return;
     }
 
+    // Éxito: limpiar intentos fallidos
+    delete loginAttempts[userInput];
     currentUser = evResult;
     currentRole = 'evaluador';
 

@@ -603,8 +603,14 @@
 
     <input type="file" id="input-restore-backup" accept="application/json" style="display:none;">
 
+    <!-- Librerías de seguridad -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bcryptjs/2.4.3/bcrypt.min.js" integrity="sha512-5ShaYPRVmBl1GaHXxsHT0NW/8OlT3pFUIBNvEMpSVJMRKAkLSWU2xdDPeJqPu5gNpVsmI2f7TaXhpvPjGQVIw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <!-- Configuración externa (seguridad) -->
+    <script src="config.js"></script>
+
     <!-- Librería para generar PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-y+5DJXfPI3jcEk2bFTOwtcKaIkKX9O3p4FKMqLXSVRR2x89OYbrDVLF0yzbGX6gQp2BsqVECKkO0OkSN0JJ8A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
     <!-- Panel de notificaciones lateral -->
     <div id="notification-panel" style="position: fixed; top: 20px; right: 20px; width: 320px; max-height: 80vh; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); overflow-y: auto; z-index: 2000; display: none;">
@@ -619,6 +625,10 @@
         </div>
     </div>
 
+    <!-- Script principal -->
     <script src="app.js"></script>
+
+    <!-- Pruebas de seguridad (opcional, solo en desarrollo) -->
+    <script src="tests.security.js"></script>
 </body>
 </html>
