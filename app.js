@@ -5262,7 +5262,12 @@ function continuarExportPDF() {
     // Ocultar progreso después de guardar
     setTimeout(() => {
         hideProgressBar();
-        notificationSystem.show('pdf-export', '✅ PDF exportado correctamente', 'success', 3);
+        notificationSystem.show('pdf-export', '✅ PDF exportado correctamente', 'success');
+
+        // Auto-ocultar mensaje después de 2 segundos
+        setTimeout(() => {
+            notificationSystem.remove('pdf-export');
+        }, 2000);
     }, 500);
 
     document.body.removeChild(printContainer);
