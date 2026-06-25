@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirigiendo...</title>
+    <script>
+        // Redirigir 404 a index.html en GitHub Pages subdirectorio
+        // Esto permite que rutas como /Calificaciones/path funcionen correctamente
+
+        function getRedirectPath() {
+            let path = window.location.pathname;
+
+            // Si no termina con .html y no es un archivo, redirigir a index.html
+            if (!path.endsWith('.html') && !path.endsWith('/') && !path.includes('.')) {
+                return path.replace(/\/$/, '') + '/';
+            }
+
+            // Siempre ir a index.html que maneja el routing
+            return window.location.pathname.split('/').slice(0, -1).join('/') + '/index.html' + window.location.search + window.location.hash;
+        }
+
+        window.location.href = getRedirectPath();
+    </script>
+</head>
+<body>
+    <p>Redirigiendo...</p>
+</body>
+</html>

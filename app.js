@@ -34,6 +34,14 @@ function cleanupAllListeners() {
     managedListeners.length = 0; // Limpiar array
 }
 
+// Resolver rutas correctamente en GitHub Pages subdirectorio
+function getBasePath() {
+    const href = document.querySelector('base')?.getAttribute('href') || '/';
+    return href.endsWith('/') ? href : href + '/';
+}
+
+const BASE_PATH = getBasePath();
+
 function generateCSRFToken() {
     // Generar token único usando timestamp + random
     const random = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -590,7 +598,8 @@ async function cloudSave(table, dataArray, mode = 'incremental', options = {}) {
             data: dataArray,
             mode,
             clientVersion,
-            csrfToken: csrfToken // Incluir CSRF token en POST
+            csrfToken: csrfToken, // CSRF token
+            sessionId: currentUser?.rut || 'guest' // Session ID para validar CSRF en GAS
         };
         if (options.forceVersion) {
             body.forceVersion = true;
@@ -1409,54 +1418,60 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupEventListeners() {
-    document.getElementById('btn-login').addEventListener('click', handleLogin);
+    // TODOS los listeners registrados aquí se limpian automáticamente en logout
+
+    addManagedListener(document.getElementById('btn-login'), 'click', handleLogin);
+
     const btnCloseNotif = document.getElementById('btn-close-notifications');
     if (btnCloseNotif) {
-        btnCloseNotif.addEventListener('click', () => {
+        addManagedListener(btnCloseNotif, 'click', () => {
             const panel = document.getElementById('notification-panel');
             if (panel) panel.style.display = 'none';
         });
     }
-    document.getElementById('btn-sync-cloud').addEventListener('click', syncFromCloud);
-    document.getElementById('btn-download-cloud').addEventListener('click', downloadHistoricosFromCloud);
-    document.getElementById('btn-logout').addEventListener('click', handleLogout);
-    document.getElementById('btn-save-items').addEventListener('click', saveAdminItems);
-    document.getElementById('btn-save-scores').addEventListener('click', (e) => { e.preventDefault(); saveEvaluatorScores(null); });
-    document.getElementById('btn-eval-pdf').addEventListener('click', exportEvaluatorPDF);
-    document.getElementById('btn-save-asignacion').addEventListener('click', () => { processAsignacionStaging(false); });
-    document.getElementById('btn-save-partial').addEventListener('click', () => { processAsignacionStaging(true); });
-    document.getElementById('btn-save-config').addEventListener('click', saveConfigDeadline);
-    document.getElementById('btn-close-modal').addEventListener('click', closeModal);
-    document.getElementById('chk-toggle-all-stages').addEventListener('change', toggleAllStagesCheckboxes);
-    document.getElementById('btn-modal-cancel').addEventListener('click', closeModal);
-    document.getElementById('btn-modal-confirm').addEventListener('click', executeCommitAsignacion);
+
+    addManagedListener(document.getElementById('btn-sync-cloud'), 'click', syncFromCloud);
+    addManagedListener(document.getElementById('btn-download-cloud'), 'click', downloadHistoricosFromCloud);
+    addManagedListener(document.getElementById('btn-logout'), 'click', handleLogout);
+    addManagedListener(document.getElementById('btn-save-items'), 'click', saveAdminItems);
+    addManagedListener(document.getElementById('btn-save-scores'), 'click', (e) => { e.preventDefault(); saveEvaluatorScores(null); });
+    addManagedListener(document.getElementById('btn-eval-pdf'), 'click', exportEvaluatorPDF);
+    addManagedListener(document.getElementById('btn-save-asignacion'), 'click', () => { processAsignacionStaging(false); });
+    addManagedListener(document.getElementById('btn-save-partial'), 'click', () => { processAsignacionStaging(true); });
+    addManagedListener(document.getElementById('btn-save-config'), 'click', saveConfigDeadline);
+    addManagedListener(document.getElementById('btn-close-modal'), 'click', closeModal);
+    addManagedListener(document.getElementById('chk-toggle-all-stages'), 'change', toggleAllStagesCheckboxes);
+    addManagedListener(document.getElementById('btn-modal-cancel'), 'click', closeModal);
+    addManagedListener(document.getElementById('btn-modal-confirm'), 'click', executeCommitAsignacion);
 
     const btnExport = document.getElementById('btn-export-reportes');
-    if (btnExport) btnExport.addEventListener('click', exportReportesExcel);
+    if (btnExport) addManagedListener(btnExport, 'click', exportReportesExcel);
 
     const btnExportBackup = document.getElementById('btn-export-backup');
-    if (btnExportBackup) btnExportBackup.addEventListener('click', exportDatabaseToJSON);
+    if (btnExportBackup) addManagedListener(btnExportBackup, 'click', exportDatabaseToJSON);
 
     const btnOpenEv = document.getElementById('btn-open-evaluador-modal');
-    if (btnOpenEv) btnOpenEv.addEventListener('click', () => {
+    if (btnOpenEv) addManagedListener(btnOpenEv, 'click', () => {
         currentEditingEvaluadorRut = null;
         clearFormInputs(['ev-nombre', 'ev-rut', 'ev-area', 'ev-clave']);
         document.getElementById('ev-rut').disabled = false;
         toggleElement('modal-evaluador', true);
     });
-    const btnCloseEv = document.getElementById('btn-close-evaluador-modal');
-    if (btnCloseEv) btnCloseEv.addEventListener('click', () => toggleElement('modal-evaluador', false));
-    const btnSaveEv = document.getElementById('btn-save-evaluador-modal');
-    if (btnSaveEv) btnSaveEv.addEventListener('click', createEvaluador);
 
-    document.getElementById('btn-open-entidad-modal').addEventListener('click', () => {
-        currentEditingEntidadId = null; // Limpiamos la memoria de edición para forzar un registro nuevo
+    const btnCloseEv = document.getElementById('btn-close-evaluador-modal');
+    if (btnCloseEv) addManagedListener(btnCloseEv, 'click', () => toggleElement('modal-evaluador', false));
+
+    const btnSaveEv = document.getElementById('btn-save-evaluador-modal');
+    if (btnSaveEv) addManagedListener(btnSaveEv, 'click', createEvaluador);
+
+    addManagedListener(document.getElementById('btn-open-entidad-modal'), 'click', () => {
+        currentEditingEntidadId = null;
         clearFormInputs(['entidad-rut', 'entidad-nombre', 'entidad-comuna', 'entidad-programa', 'entidad-convenio', 'entidad-fecha']);
         toggleElement('modal-entidad', true);
     });
 
-    document.getElementById('btn-close-entidad-modal').addEventListener('click', () => {
-        currentEditingEntidadId = null; // Limpiamos en caso de que el usuario cancele la edición
+    addManagedListener(document.getElementById('btn-close-entidad-modal'), 'click', () => {
+        currentEditingEntidadId = null;
         toggleElement('modal-entidad', false);
     });
 
@@ -2201,9 +2216,12 @@ function handleLogin() {
                 return;
             }
             
-            // Verificar contraseña con datos del servidor
-            if (passInput !== remoteClave.valor) {
+            // Verificar contraseña con bcrypt (comparar contra hash)
+            const passwordValid = dcodeIO.bcrypt.compareSync(passInput, remoteClave.valor);
+
+            if (!passwordValid) {
                 // RATE LIMITING: Registrar intento fallido
+                const now = Date.now();
                 if (!loginAttempts[userInput]) {
                     loginAttempts[userInput] = { count: 0, timestamp: now };
                 }
@@ -2213,7 +2231,7 @@ function handleLogin() {
                 if (attemptsLeft > 0) {
                     alert(`❌ Contraseña incorrecta.\n\nIntento ${loginAttempts[userInput].count}/${SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS}\n${attemptsLeft} intentos restantes`);
                 } else {
-                    loginAttempts[userInput].timestamp = now; // Reiniciar contador de bloqueo
+                    loginAttempts[userInput].timestamp = now;
                     const lockoutMins = Math.ceil(SECURITY_CONFIG.LOCKOUT_DURATION_MS / 60000);
                     alert(`🔒 Máximo de intentos alcanzado.\n\nCuenta bloqueada por ${lockoutMins} minutos por seguridad.`);
                 }
