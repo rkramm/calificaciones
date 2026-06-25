@@ -4525,7 +4525,12 @@ function calculateLiveScore() {
     inputs.forEach(input => {
         let val = parseInt(input.value, 10);
         const id = input.getAttribute('data-id');
-        const existingIdx = allMemoryScores.findIndex(r => r.cobertura === currentCoverage && r.itemId === id && parseInt(r.stage,10) === currentStage);
+        const existingIdx = allMemoryScores.findIndex(r =>
+            r.cobertura === currentCoverage &&
+            r.itemId === id &&
+            parseInt(r.stage,10) === currentStage &&
+            r.entidad === window.currentSelectedEntity
+        );
         
         if (isNaN(val)) { 
             delete dbScores[id]; 
