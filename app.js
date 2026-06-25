@@ -109,6 +109,71 @@ let reportesSortCol = -1;
 let reportesSortAsc = true;
 let hasUnsavedEvaluatorChanges = false;
 
+// Sistema de notificaciones
+const notificationSystem = {
+    notifications: {},
+
+    show(id, message, type = 'info', progress = null) {
+        const panel = document.getElementById('notification-panel');
+        const list = document.getElementById('notification-list');
+
+        if (!panel || !list) return;
+
+        panel.style.display = 'block';
+
+        if (!this.notifications[id]) {
+            const html = `
+                <div id="notif-${id}" style="background: #F5F7FA; border-left: 4px solid #006BB9; padding: 12px; margin-bottom: 10px; border-radius: 4px; font-size: 0.85rem;">
+                    <div style="font-weight: 600; color: var(--primary-dark); margin-bottom: 4px;">${message}</div>
+                    <div id="notif-${id}-progress" style="margin-top: 8px;"></div>
+                </div>
+            `;
+            list.insertAdjacentHTML('beforeend', html);
+            this.notifications[id] = { message, type, progress };
+        } else {
+            const elem = document.getElementById(`notif-${id}`);
+            if (elem) {
+                elem.querySelector('div:first-of-type').textContent = message;
+                this.notifications[id].message = message;
+            }
+        }
+
+        if (progress !== null) {
+            this.updateProgress(id, progress);
+        }
+    },
+
+    updateProgress(id, progress) {
+        const progressDiv = document.getElementById(`notif-${id}-progress`);
+        if (!progressDiv) return;
+
+        const percent = Math.min(100, Math.max(0, progress));
+        progressDiv.innerHTML = `
+            <div style="background: #E8EAED; height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="background: linear-gradient(90deg, #006BB9, #28A745); height: 100%; width: ${percent}%; transition: width 0.3s ease;"></div>
+            </div>
+            <div style="font-size: 0.75rem; color: #666; margin-top: 4px; text-align: right;">${percent}%</div>
+        `;
+    },
+
+    remove(id) {
+        const elem = document.getElementById(`notif-${id}`);
+        if (elem) {
+            elem.style.opacity = '0';
+            elem.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => elem.remove(), 300);
+        }
+        delete this.notifications[id];
+
+        if (Object.keys(this.notifications).length === 0) {
+            const panel = document.getElementById('notification-panel');
+            if (panel) {
+                setTimeout(() => { panel.style.display = 'none'; }, 1000);
+            }
+        }
+    }
+};
+
 /* ================= FUNCIONES AUXILIARES (REDUCCIÓN DE CÓDIGO) ================= */
 function formatDDMMYYYY(dateObj) {
     const d = dateObj.getDate().toString().padStart(2, '0');
@@ -498,6 +563,61 @@ function downloadAutoBackupJSON() {
                 }
             }
         };
+    });
+}
+
+/**
+ * Sincroniza datos en background después del login sin bloquear la UI
+ */
+function backgroundSyncAfterLogin() {
+    if (!CLOUD_MODE_ENABLED) return;
+
+    const storeNames = ['entidades', 'asignaciones', 'items'];
+    let completed = 0;
+
+    notificationSystem.show('bg-sync', '🔄 Iniciando sincronización de datos...', 'info');
+
+    storeNames.forEach((storeName, index) => {
+        setTimeout(() => {
+            notificationSystem.show('bg-sync', `📥 Descargando ${storeName}...`, 'info', (index / storeNames.length) * 50);
+
+            cloudGet(storeName).then(data => {
+                if (data && Array.isArray(data) && data.length > 0) {
+                    // Guardar en IndexedDB
+                    const tx = dbInstance.transaction([storeName], 'readwrite');
+                    const store = tx.objectStore(storeName);
+                    data.forEach(item => store.put(item));
+
+                    tx.oncomplete = () => {
+                        completed++;
+                        const progress = 50 + (completed / storeNames.length) * 50;
+                        notificationSystem.show('bg-sync', `✅ ${storeName} actualizado (${data.length} registros)`, 'success', progress);
+
+                        if (completed === storeNames.length) {
+                            notificationSystem.show('bg-sync', '✅ Datos sincronizados correctamente', 'success', 100);
+                            setTimeout(() => notificationSystem.remove('bg-sync'), 2000);
+                        }
+                    };
+
+                    tx.onerror = () => {
+                        notificationSystem.show('bg-sync', `⚠️ Error al guardar ${storeName}`, 'warning');
+                    };
+                } else {
+                    completed++;
+                    if (completed === storeNames.length) {
+                        notificationSystem.show('bg-sync', '✅ Datos sincronizados correctamente', 'success', 100);
+                        setTimeout(() => notificationSystem.remove('bg-sync'), 2000);
+                    }
+                }
+            }).catch(err => {
+                console.warn(`No se pudo sincronizar ${storeName}:`, err);
+                completed++;
+                if (completed === storeNames.length) {
+                    notificationSystem.show('bg-sync', '⚠️ Sincronización parcial (algunos datos offline)', 'warning', 100);
+                    setTimeout(() => notificationSystem.remove('bg-sync'), 3000);
+                }
+            });
+        }, index * 1000); // Espaciar las solicitudes 1 segundo cada una
     });
 }
 
@@ -1180,6 +1300,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function setupEventListeners() {
     document.getElementById('btn-login').addEventListener('click', handleLogin);
+    const btnCloseNotif = document.getElementById('btn-close-notifications');
+    if (btnCloseNotif) {
+        btnCloseNotif.addEventListener('click', () => {
+            const panel = document.getElementById('notification-panel');
+            if (panel) panel.style.display = 'none';
+        });
+    }
     document.getElementById('btn-sync-cloud').addEventListener('click', syncFromCloud);
     document.getElementById('btn-download-cloud').addEventListener('click', downloadHistoricosFromCloud);
     document.getElementById('btn-logout').addEventListener('click', handleLogout);
@@ -2477,6 +2604,9 @@ function showPanel(titleText) {
         checkDeadlineStatus();
         startCountdownClock();
         renderCoverageTabs();
+
+        // Sincronizar datos en background sin bloquear UI
+        setTimeout(() => backgroundSyncAfterLogin(), 500);
     }
 }
 

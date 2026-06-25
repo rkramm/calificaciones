@@ -614,6 +614,19 @@
 
     <input type="file" id="input-restore-backup" accept="application/json" style="display:none;">
 
+    <!-- Panel de notificaciones lateral -->
+    <div id="notification-panel" style="position: fixed; top: 20px; right: 20px; width: 320px; max-height: 80vh; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); overflow-y: auto; z-index: 2000; display: none;">
+        <div style="padding: 16px; border-bottom: 2px solid #E8EAED;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <h3 style="margin: 0; color: var(--primary-dark); font-size: 0.95rem;">🔄 Sincronización</h3>
+                <button id="btn-close-notifications" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #999;">✕</button>
+            </div>
+        </div>
+        <div id="notification-list" style="padding: 12px; max-height: calc(80vh - 60px); overflow-y: auto;">
+            <!-- Las notificaciones aparecerán aquí -->
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
