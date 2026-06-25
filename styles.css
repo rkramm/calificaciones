@@ -56,16 +56,37 @@ html { scroll-behavior: smooth; }
 .text-center { text-align: center; }
 .bold-text { font-weight: bold; }
 
-/* ================= TOOLTIPS - USO DE TITLE NATIVO ================= */
-/* Los tooltips de etapas usan el atributo title nativo del navegador */
-/* que funciona incluso con overflow: hidden */
-button[title] {
-    cursor: help;
+/* ================= TOOLTIPS VISUALES PARA ETAPAS ================= */
+.stage-with-tooltip {
+    position: relative;
 }
 
-/* Estilo opcional para botones con tooltip */
-.tab-button[title]:hover {
-    text-decoration: underline dotted;
+.stage-tooltip-box {
+    position: fixed;
+    background-color: #1a1a1a;
+    color: #ffffff;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    max-width: 300px;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    z-index: 10000;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    line-height: 1.4;
+    pointer-events: none;
+    animation: fadeInTooltip 0.2s ease-in;
+}
+
+@keyframes fadeInTooltip {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

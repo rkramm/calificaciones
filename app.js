@@ -1447,6 +1447,38 @@ document.addEventListener('DOMContentLoaded', () => {
     initIndexedDB(() => { setupEventListeners(); setupAdminTabs(); setupMatrixLogisticsDrivers(); checkDeadlineStatus(); });
 });
 
+// Sistema de tooltips visuales para etapas
+function setupStageTooltips() {
+    let currentTooltip = null;
+
+    document.addEventListener('mouseover', (e) => {
+        const btn = e.target.closest('.stage-with-tooltip');
+        if (!btn) return;
+
+        const tooltipText = btn.getAttribute('data-tooltip-text');
+        if (!tooltipText) return;
+
+        // Crear tooltip
+        currentTooltip = document.createElement('div');
+        currentTooltip.className = 'stage-tooltip-box';
+        currentTooltip.textContent = tooltipText;
+        document.body.appendChild(currentTooltip);
+
+        // Posicionar tooltip debajo del botón
+        const rect = btn.getBoundingClientRect();
+        currentTooltip.style.left = (rect.left + rect.width / 2 - 150) + 'px';
+        currentTooltip.style.top = (rect.bottom + 10) + 'px';
+    });
+
+    document.addEventListener('mouseout', (e) => {
+        const btn = e.target.closest('.stage-with-tooltip');
+        if (btn && currentTooltip) {
+            currentTooltip.remove();
+            currentTooltip = null;
+        }
+    });
+}
+
 // Agregar textos de ayuda (tooltips) a elementos interactivos
 function setupHelpTexts() {
     // Textos para botones
@@ -1489,6 +1521,9 @@ function setupHelpTexts() {
             element.placeholder = element.placeholder || text;
         }
     });
+
+    // Inicializar tooltips de etapas
+    setupStageTooltips();
 }
 
 function setupEventListeners() {
@@ -3388,17 +3423,16 @@ window.changeStage = function(stageNum) {
         let etapasDisponibles = [1,2,3,4,5,6];
         etapasDisponibles.forEach(i => {
             const btn = document.createElement('button');
-            btn.className = `tab-button ${currentStage === i ? 'active' : ''}`;
+            btn.className = `tab-button stage-with-tooltip ${currentStage === i ? 'active' : ''}`;
 
-            // Agregar tooltip nativo del navegador con descripción de la etapa
+            // Agregar tooltip con descripción de la etapa
             const stageInfo = STAGES_METADATA[i];
             if (stageInfo) {
-                // Mostrar nombre de etapa + descripción en tooltip
+                // Mostrar nombre de etapa en botón
                 btn.textContent = `${stageInfo.short}`;
-                // Tooltip nativo - usa saltos de línea simples
-                btn.title = `${stageInfo.title} - ${stageInfo.desc}`;
-                btn.style.whiteSpace = 'normal';
-                btn.style.cursor = 'help';
+                // Agregar tooltip como atributo data
+                btn.setAttribute('data-tooltip-text', `${stageInfo.title}\n${stageInfo.desc}`);
+                btn.style.position = 'relative';
             } else {
                 btn.textContent = `Etapa ${i}`;
             }
