@@ -4795,18 +4795,17 @@ function applyConflictResolution(added, removed, modified, remoteData) {
 /* ================= EXPORTACIÓN A PDF DEL EVALUADOR ================= */
 function exportEvaluatorPDF() {
     const exportDate = formatDateTime(new Date());
-
     const printContainer = document.createElement('div');
     printContainer.id = 'pdf-print-container';
-    
+
     let contentHtml = `
-        <div style="text-align:center; margin-bottom: 20px;">
-            <h2 style="color: var(--primary-dark); font-size: 1.5rem; margin-bottom: 5px;">Respaldo Integral de Precalificaciones</h2>
-            <p style="font-size: 1rem; margin-bottom: 2px;"><strong>Evaluador:</strong> ${currentUser.nombre} (${currentUser.rut})</p>
-            <p style="font-size: 1rem;"><strong>Fecha y Hora de Exportación:</strong> ${exportDate}</p>
+        <div class="pdf-header">
+            <h1>📋 RESPALDO DE PRECALIFICACIONES</h1>
+            <p><strong>${currentUser.nombre}</strong> (${currentUser.rut})</p>
+            <p>Fecha: ${exportDate}</p>
         </div>
     `;
-    
+
     allAsignacionesMapped.forEach(asig => {
         asig.etapas.forEach(stg => {
             const stageRecords = allMemoryScores.filter(r => r.cobertura === asig.cobertura && r.stage === stg);
@@ -4819,18 +4818,18 @@ function exportEvaluatorPDF() {
             });
 
             const meta = STAGES_METADATA[stg] || { title: `ETAPA ${stg}`, desc: "" };
-            const stageItems = dbItems.filter(i => i.stage === stg);
+            const stageItems = dbItems.filter(i => parseInt(i.stage, 10) === parseInt(stg, 10));
             let totalScore = 0, countScore = 0;
-            
+
             const rowsHtml = stageItems.map(item => {
                 const rec = stageRecords.find(r => r.itemId === item.id);
                 const val = rec && rec.score !== undefined ? rec.score : "-";
                 if (val !== "-") { totalScore += parseInt(val, 10); countScore++; }
                 return `
                     <tr>
-                        <td style="border: 1px solid #000; padding: 6px; font-weight:bold; text-align:center; width:8%;">${item.id}</td>
-                        <td style="border: 1px solid #000; padding: 6px; width:77%; font-size: 0.85rem;">${item.text}</td>
-                        <td style="border: 1px solid #000; padding: 6px; text-align:center; font-weight:bold; width:15%;">${val}</td>
+                        <td style="width: 8%; text-align: center;">${item.id}</td>
+                        <td style="width: 77%;">${item.text}</td>
+                        <td class="pdf-score" style="width: 15%;">${val}</td>
                     </tr>
                 `;
             }).join('');
@@ -4838,18 +4837,42 @@ function exportEvaluatorPDF() {
             const finalAvg = countScore > 0 ? Math.round(totalScore / countScore) : 0;
             const status = getStatusInfo(finalAvg);
             const statusText = countScore > 0 ? status.text : "---";
+            const statusClass = statusText === "BUENO" ? "pdf-status-bueno" : statusText === "ACEPTABLE" ? "pdf-status-aceptable" : "pdf-status-malo";
+
+            const [programa, provincia] = asig.cobertura.split(' - ');
+            const entidad = asig.entidadNombre || "No especificada";
 
             contentHtml += `
-                <div style="page-break-inside: avoid; margin-bottom: 30px;">
-                    <table style="width:100%; border-collapse: collapse; margin-bottom: 8px; font-size: 0.9rem;">
-                        <tr><td style="padding: 4px; border: 1px solid #000; background-color: #EEE; width: 25%;"><strong>Cobertura:</strong></td><td style="padding: 4px; border: 1px solid #000;">${asig.cobertura}</td></tr>
-                        <tr><td style="padding: 4px; border: 1px solid #000; background-color: #EEE;"><strong>Fecha de Calificación:</strong></td><td style="padding: 4px; border: 1px solid #000;">${lastEvalDate}</td></tr>
-                    </table>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <div class="pdf-section">
+                    <div class="pdf-section-header">
+                        <div class="pdf-stage-title">${meta.title}</div>
+                    </div>
+
+                    <div class="pdf-info-grid">
+                        <div class="pdf-info-item">
+                            <div class="pdf-info-label">🏢 Entidad</div>
+                            <div class="pdf-info-value">${entidad}</div>
+                        </div>
+                        <div class="pdf-info-item">
+                            <div class="pdf-info-label">📊 Programa</div>
+                            <div class="pdf-info-value">${programa || "Sin asignar"}</div>
+                        </div>
+                        <div class="pdf-info-item">
+                            <div class="pdf-info-label">📍 Provincia</div>
+                            <div class="pdf-info-value">${provincia || "Sin asignar"}</div>
+                        </div>
+                        <div class="pdf-info-item">
+                            <div class="pdf-info-label">📅 Fecha Calificación</div>
+                            <div class="pdf-info-value">${lastEvalDate}</div>
+                        </div>
+                    </div>
+
+                    <table class="pdf-table">
                         <thead>
-                            <tr style="background-color: var(--primary-dark); color: #FFF; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
-                                <th colspan="2" style="border: 1px solid #000; padding: 6px; text-align:left;">${meta.title}</th>
-                                <th style="border: 1px solid #000; padding: 6px; text-align:center;">NOTA</th>
+                            <tr>
+                                <th style="width: 8%;">Ítem</th>
+                                <th style="width: 77%;">Criterio de Evaluación</th>
+                                <th style="width: 15%; text-align: center;">Nota</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -4857,8 +4880,11 @@ function exportEvaluatorPDF() {
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="2" style="border: 1px solid #000; padding: 6px; text-align:right; font-weight:bold; background-color: #F8F9FA;">ESTADO: <span style="color:${status.color === '#FFF' ? '#000' : status.color};">${statusText}</span> | PROMEDIO FINAL</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-weight:bold; font-size: 1.1rem; background-color: #F8F9FA;">${countScore > 0 ? finalAvg : '-'}</td>
+                                <td colspan="2" style="text-align: right;">PROMEDIO ETAPA ${stg}:</td>
+                                <td class="pdf-score ${statusClass}">${countScore > 0 ? finalAvg : '-'}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="text-align: center; padding: 8px; font-weight: bold;">ESTADO: <span class="${statusClass}">${statusText}</span></td>
                             </tr>
                         </tfoot>
                     </table>

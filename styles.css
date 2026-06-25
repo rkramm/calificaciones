@@ -558,6 +558,144 @@ button { font-family: 'Segoe UI', sans-serif; }
     }
 }
 
+/* ================= ESTILOS PARA IMPRESIÓN (PAPEL OFICIO) ================= */
+@media print {
+    @page {
+        size: 8.5in 13in;
+        margin: 0.5in;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: white;
+    }
+
+    #pdf-print-container {
+        width: 100%;
+        color: #333;
+        font-family: 'Segoe UI', Arial, sans-serif;
+    }
+
+    .pdf-header {
+        background: linear-gradient(135deg, #25306B 0%, #006BB9 100%);
+        color: white;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 4px;
+        text-align: center;
+    }
+
+    .pdf-header h1 {
+        margin: 0 0 8px 0;
+        font-size: 1.2rem;
+    }
+
+    .pdf-header p {
+        margin: 2px 0;
+        font-size: 0.8rem;
+    }
+
+    .pdf-section {
+        page-break-inside: avoid;
+        margin-bottom: 15px;
+        border: 1px solid #E8EAED;
+        border-radius: 4px;
+        padding: 10px;
+    }
+
+    .pdf-section-header {
+        background: #F5F7FA;
+        border-bottom: 2px solid #25306B;
+        padding: 8px;
+        margin: -10px -10px 10px -10px;
+        border-radius: 3px 3px 0 0;
+    }
+
+    .pdf-info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 10px;
+        font-size: 0.85rem;
+    }
+
+    .pdf-info-item {
+        background: #FAFBFC;
+        padding: 6px;
+        border-left: 3px solid #006BB9;
+    }
+
+    .pdf-info-label {
+        font-weight: bold;
+        color: #25306B;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+
+    .pdf-info-value {
+        color: #333;
+        margin-top: 2px;
+    }
+
+    .pdf-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+        font-size: 0.8rem;
+    }
+
+    .pdf-table th {
+        background: #25306B;
+        color: white;
+        padding: 6px;
+        text-align: left;
+        font-weight: bold;
+        border: 1px solid #000;
+    }
+
+    .pdf-table td {
+        border: 1px solid #000;
+        padding: 5px;
+    }
+
+    .pdf-table tbody tr:nth-child(even) {
+        background: #F9FAFB;
+    }
+
+    .pdf-table tfoot tr {
+        background: #F0F0F0;
+        font-weight: bold;
+    }
+
+    .pdf-stage-title {
+        font-size: 0.9rem;
+        font-weight: bold;
+        color: #25306B;
+        margin-bottom: 6px;
+    }
+
+    .pdf-score {
+        text-align: center;
+        font-weight: bold;
+    }
+
+    .pdf-status-malo {
+        color: #FF0000;
+        font-weight: bold;
+    }
+
+    .pdf-status-aceptable {
+        color: #F57C00;
+        font-weight: bold;
+    }
+
+    .pdf-status-bueno {
+        color: #388E3C;
+        font-weight: bold;
+    }
+}
+
 /* Reducir espacio vertical entre filas en un 40% */
 #evaluation-rows tr {
     height: auto !important;
