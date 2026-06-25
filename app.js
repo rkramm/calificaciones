@@ -4414,10 +4414,15 @@ if (!document.getElementById('toast-styles')) {
 
 function loadScoresFromActiveContext() {
     dbScores = {};
-    const filteredScores = allMemoryScores.filter(r => r.cobertura === currentCoverage && r.stage === currentStage);
+    const filteredScores = allMemoryScores.filter(r =>
+        r.cobertura === currentCoverage &&
+        r.stage === currentStage &&
+        r.entidad === window.currentSelectedEntity
+    );
 
     console.log(`🔍 loadScoresFromActiveContext:`);
     console.log(`   - Cobertura actual: "${currentCoverage}"`);
+    console.log(`   - Entidad actual: "${window.currentSelectedEntity}"`);
     console.log(`   - Etapa actual: ${currentStage} (tipo: ${typeof currentStage})`);
     console.log(`   - Total scores en memoria: ${allMemoryScores.length}`);
 
