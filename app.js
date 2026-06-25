@@ -1161,61 +1161,58 @@ function downloadHistoricosFromCloud() {
     );
     if (!confirmed) return;
 
-    showProgressBar('Descargando asignaciones desde la Nube...');
+    notificationSystem.show('download-asig', '📥 Descargando asignaciones...', 'info', 10);
     console.log('🔗 Conectando a Google Sheets:', GOOGLE_SCRIPT_URL);
 
     const timeoutPromise = new Promise((resolve) => {
         setTimeout(() => {
             console.warn('⏱️ Se alcanzó el timeout de 40 segundos');
             resolve(null);
-        }, 40000); // 40 segundos de timeout (permite que cloudGet termine primero)
+        }, 40000);
     });
 
     Promise.race([cloudGet('asignaciones'), timeoutPromise]).then(asignaciones => {
         console.log('📥 Datos recibidos del servidor:', asignaciones);
 
         if (asignaciones === null) {
-            hideProgressBar();
             console.warn('⏱️ Timeout o error descargando asignaciones');
-            alert('No se pudo conectar con Google Sheets.\n\nVerifique su conexión a internet.\n\nSe está usando el caché local si está disponible.');
+            notificationSystem.show('download-asig', '⚠️ No se pudo conectar (usando caché local)', 'warning', 100);
+            setTimeout(() => notificationSystem.remove('download-asig'), 3000);
             return;
         }
 
-        // Validar que la tabla exista en IndexedDB
         if (!dbInstance.objectStoreNames.contains('asignaciones')) {
-            hideProgressBar();
-            alert('Error: La base de datos local no tiene la tabla de asignaciones.\n\nPor favor, recargue la página para inicializar la base de datos.');
+            notificationSystem.show('download-asig', '❌ Error en base de datos local', 'warning');
+            setTimeout(() => notificationSystem.remove('download-asig'), 3000);
             return;
         }
 
         if (!asignaciones || asignaciones.length === 0) {
-            // Limpiar asignaciones locales si no hay en Google Sheets
             const tx = dbInstance.transaction(['asignaciones'], 'readwrite');
             const asigStore = tx.objectStore('asignaciones');
             asigStore.clear();
 
             tx.oncomplete = () => {
-                hideProgressBar();
-                console.warn('⚠️ No hay asignaciones en Google Sheets. Base de datos local limpiada.');
-                alert('⚠️ No se encontraron asignaciones en Google Sheets.\n\nLa aplicación está lista pero sin datos.\n\nVerifique que la tabla "asignaciones" tenga datos en el datasheet.');
+                notificationSystem.show('download-asig', '⚠️ Sin asignaciones en el servidor', 'warning', 100);
+                setTimeout(() => notificationSystem.remove('download-asig'), 3000);
                 renderMonitoringTable();
                 populateAdminMatrix();
             };
 
-            tx.onerror = (e) => {
-                hideProgressBar();
-                console.error('Error limpiando asignaciones locales:', e.target.error);
-                alert('Error al limpiar la base de datos local.\n\nDetalle: ' + (e.target.error ? e.target.error.message : 'Error desconocido'));
+            tx.onerror = () => {
+                notificationSystem.show('download-asig', '❌ Error al limpiar datos', 'warning');
+                setTimeout(() => notificationSystem.remove('download-asig'), 3000);
             };
             return;
         }
 
         const tx = dbInstance.transaction(['asignaciones'], 'readwrite');
         const asigStore = tx.objectStore('asignaciones');
-
         let asigCount = 0;
 
-        // Limpiar y guardar asignaciones
+        notificationSystem.updateProgress('download-asig', 50);
+        notificationSystem.show('download-asig', `💾 Guardando ${asignaciones.length} registros...`, 'info', 60);
+
         asigStore.clear().onsuccess = () => {
             if (Array.isArray(asignaciones)) {
                 console.log('💾 Guardando', asignaciones.length, 'asignaciones en IndexedDB');
@@ -1231,22 +1228,22 @@ function downloadHistoricosFromCloud() {
         };
 
         tx.oncomplete = () => {
-            hideProgressBar();
             console.log('✅ Transacción completada con', asigCount, 'registros');
-            alert(`✅ Asignaciones descargadas correctamente.\n\nRegistros guardados: ${asigCount}`);
+            notificationSystem.show('download-asig', `✅ Asignaciones descargadas correctamente`, 'success', 100);
+            setTimeout(() => notificationSystem.remove('download-asig'), 2000);
             renderMonitoringTable();
             populateAdminMatrix();
         };
 
         tx.onerror = (e) => {
-            hideProgressBar();
             console.error('Error en transacción de IndexedDB:', e.target.error);
-            alert('Error al guardar los datos descargados localmente.\n\nDetalle: ' + (e.target.error ? e.target.error.message : 'Error desconocido'));
+            notificationSystem.show('download-asig', '❌ Error al guardar datos', 'warning');
+            setTimeout(() => notificationSystem.remove('download-asig'), 3000);
         };
     }).catch(err => {
-        hideProgressBar();
         console.error('Error descargando asignaciones:', err);
-        alert('Error al descargar asignaciones.\n\nVerifique su conexión a internet.\n\nDetalle: ' + err.message);
+        notificationSystem.show('download-asig', '❌ Error de conexión', 'warning');
+        setTimeout(() => notificationSystem.remove('download-asig'), 3000);
     });
 }
 /* =============================================================================== */
