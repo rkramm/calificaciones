@@ -3430,8 +3430,8 @@ window.changeStage = function(stageNum) {
             if (stageInfo) {
                 // Mostrar nombre de etapa en botón
                 btn.textContent = `${stageInfo.short}`;
-                // Agregar tooltip como atributo data
-                btn.setAttribute('data-tooltip-text', `${stageInfo.title}\n${stageInfo.desc}`);
+                // Usar solo el título de STAGES_METADATA para el tooltip
+                btn.setAttribute('data-tooltip-text', stageInfo.title);
                 btn.style.position = 'relative';
             } else {
                 btn.textContent = `Etapa ${i}`;
