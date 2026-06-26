@@ -631,18 +631,11 @@
     <!-- Librerías de seguridad -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bcryptjs/2.4.3/bcrypt.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-    <!-- Configuración externa (seguridad) - con fallback -->
-    <script>
-        // Cargar config.js (desarrollo local) o config.default.js (GitHub Pages)
-        const configScript = document.createElement('script');
-        configScript.src = 'config.js';
-        configScript.onerror = () => {
-            const defaultConfig = document.createElement('script');
-            defaultConfig.src = 'config.default.js';
-            document.head.appendChild(defaultConfig);
-        };
-        document.head.appendChild(configScript);
-    </script>
+    <!-- Configuración por defecto (siempre carga) -->
+    <script src="config.default.js"></script>
+
+    <!-- Configuración local (sobrescribe si existe - desarrollo local) -->
+    <script src="config.js" onerror="console.log('config.js no encontrado, usando config.default.js')"></script>
 
     <!-- Librería para generar PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
