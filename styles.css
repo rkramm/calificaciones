@@ -836,22 +836,37 @@ button { font-family: 'Segoe UI', sans-serif; }
         font-size: 0.8rem !important;
     }
 
-    /* Reducir ancho de cell-score-input (nota) - 50% menos */
+    /* Aumentar ancho de cell-score-input (nota) con semáforo */
     .cell-score-input {
-        width: 9% !important;
-        padding: 1px 2px !important;
+        width: 22% !important;
+        padding: 1px 4px !important;
+        position: relative !important;
     }
 
     .cell-score-input input {
         width: 100% !important;
-        padding: 2px 2px !important;
-        font-size: 0.75rem !important;
+        padding: 2px 4px !important;
+        font-size: 0.7rem !important;
         height: 24px !important;
+        text-align: center !important;
+    }
+
+    /* Semáforo visual cuando el input está vacío */
+    .cell-score-input::after {
+        content: '';
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: none;
     }
 
     /* Aumentar ancho de cell-desc (descripción) */
     .cell-desc {
-        width: 88% !important;
+        width: 75% !important;
         padding: 1px 8px !important;
         font-size: 0.75rem !important;
     }
