@@ -4326,16 +4326,18 @@ function saveEvaluatorScores(callback, options = {}) {
             }
         });
 
-        // IMPORTANTE: Incluir TODOS los registros acumulados del usuario actual y cobertura actual
+        // IMPORTANTE: Incluir TODOS los registros acumulados del usuario actual, cobertura actual Y entidad actual
         // No filtrar por currentInputValues, ya que otros registros están en otras etapas fuera del DOM
         const recordsToSave = allMemoryScores
             .filter(r => {
                 // Incluir si:
                 // 1. Es del usuario actual
                 // 2. Es de la cobertura actual
-                // 3. Tiene un valor > 0 (ya guardado en allMemoryScores)
+                // 3. Es de la entidad actual (CRÍTICO para evitar sobrescribir otras entidades)
+                // 4. Tiene un valor > 0 (ya guardado en allMemoryScores)
                 const passes = r.rutEvaluador === currentUser.rut &&
                                r.cobertura === currentCoverage &&
+                               r.entidad === window.currentSelectedEntity &&
                                r.score > 0;
                 return passes;
             })
