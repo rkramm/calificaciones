@@ -861,47 +861,28 @@ button { font-family: 'Segoe UI', sans-serif; }
         display: none !important;
     }
 
-    /* Reducir ancho de cell-index (número del item) */
+    /* Móvil - mantener anchos del colgroup, solo ajustar padding y tamaño */
     .cell-index {
-        width: 5% !important;
-        min-width: 25px !important;
         padding: 4px 4px !important;
-        font-size: 0.8rem !important;
+        font-size: 0.75rem !important;
     }
 
-    /* Reducir ancho de cell-score-input (nota) con semáforo */
+    .cell-desc {
+        padding: 4px 6px !important;
+        font-size: 0.7rem !important;
+    }
+
     .cell-score-input {
-        width: 25% !important;
-        padding: 4px 4px !important;
+        padding: 2px 2px !important;
         position: relative !important;
     }
 
     .cell-score-input input {
         width: 100% !important;
-        padding: 2px 4px !important;
-        font-size: 0.75rem !important;
-        height: 24px !important;
+        padding: 2px 2px !important;
+        font-size: 0.65rem !important;
+        height: 22px !important;
         text-align: center !important;
-    }
-
-    /* Semáforo visual cuando el input está vacío */
-    .cell-score-input::after {
-        content: '';
-        position: absolute;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        right: 4px;
-        top: 50%;
-        transform: translateY(-50%);
-        display: none;
-    }
-
-    /* Aumentar ancho de cell-desc (descripción) */
-    .cell-desc {
-        width: 70% !important;
-        padding: 4px 8px !important;
-        font-size: 0.75rem !important;
     }
 
     /* Header sticky en móvil - ocupa ancho completo */
