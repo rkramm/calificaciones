@@ -5,29 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Redirigiendo...</title>
     <script>
-        // Redirigir 404 a index.html en GitHub Pages subdirectorio
-        // Maneja mayúsculas/minúsculas y rutas internas
+        // GitHub Pages 404 redirect handler
+        // Maneja redirecciones de caso insensible y rutas SPA
 
-        function getRedirectPath() {
-            let path = window.location.pathname;
+        let path = window.location.pathname;
+        let search = window.location.search;
+        let hash = window.location.hash;
 
-            // Manejar /calificaciones (minúscula) → /Calificaciones (mayúscula)
-            if (path.includes('/calificaciones')) {
-                path = path.replace(/\/calificaciones/i, '/Calificaciones');
-                window.location.href = window.location.protocol + '//' + window.location.host + path + window.location.search + window.location.hash;
-                return;
-            }
-
-            // Si no termina con .html y no es un archivo, redirigir a index.html
-            if (!path.endsWith('.html') && !path.endsWith('/') && !path.includes('.')) {
-                return path.replace(/\/$/, '') + '/';
-            }
-
-            // Siempre ir a index.html que maneja el routing
-            return window.location.pathname.split('/').slice(0, -1).join('/') + '/index.html' + window.location.search + window.location.hash;
+        // Caso 1: /calificaciones → /Calificaciones
+        if (path.toLowerCase().includes('/calificaciones')) {
+            // Reemplazar /calificaciones con /Calificaciones (cualquier caso)
+            path = path.replace(/\/calificaciones/i, '/Calificaciones');
+            window.location.href = window.location.protocol + '//' + window.location.host + path + search + hash;
         }
-
-        window.location.href = getRedirectPath();
+        // Caso 2: Otras rutas no encontradas → redirigir a index.html
+        else {
+            // Extraer el directorio base (e.g., /Calificaciones/)
+            const pathParts = path.split('/').filter(Boolean);
+            if (pathParts.length > 0) {
+                const baseDir = '/' + pathParts[0] + '/';
+                window.location.href = window.location.protocol + '//' + window.location.host + baseDir + 'index.html' + search + hash;
+            } else {
+                window.location.href = window.location.protocol + '//' + window.location.host + '/' + search + hash;
+            }
+        }
     </script>
 </head>
 <body>
