@@ -3180,6 +3180,41 @@ function renderStagesForEvaluator(asignaciones) {
         };
         container.appendChild(badge);
     });
+
+    // Agregar promedio entidad dentro del contenedor
+    const avgWrapper = document.createElement('div');
+    avgWrapper.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-left: auto;
+        padding-left: 12px;
+        white-space: nowrap;
+    `;
+    const avgLabel = document.createElement('span');
+    avgLabel.style.cssText = `
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--primary-dark);
+    `;
+    avgLabel.textContent = 'Promedio:';
+    const avgBox = document.createElement('div');
+    avgBox.id = 'entity-average-box';
+    avgBox.style.cssText = `
+        background-color: #F5F7FA;
+        border: 1px solid #E8EAED;
+        border-radius: 4px;
+        padding: 4px 10px;
+        font-weight: 600;
+        color: var(--primary-dark);
+        font-size: 0.85rem;
+        min-width: 40px;
+        text-align: center;
+    `;
+    avgBox.textContent = '0';
+    avgWrapper.appendChild(avgLabel);
+    avgWrapper.appendChild(avgBox);
+    container.appendChild(avgWrapper);
 }
 
 /**
