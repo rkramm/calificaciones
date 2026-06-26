@@ -1444,20 +1444,28 @@ const DB_NAME = 'SistemaEvaluacionDB_v22';
 const DB_VERSION = 9; // Incrementado para forzar limpieza completa de IndexedDB corrupto
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Timeout fallback para móvil: si IndexedDB tarda más de 2s, actualizar indicador igualmente
-    const connectionTimeoutId = setTimeout(() => {
+    // Timeout fallback para móvil: si IndexedDB tarda, actualizar indicador rápido
+    let connectionUpdated = false;
+
+    function updateConnectionStatus() {
+        if (connectionUpdated) return;
+        connectionUpdated = true;
         const dot = document.getElementById('conn-dot');
         const txt = document.getElementById('conn-text');
-        if (dot && txt && txt.textContent === 'Verificando conexión...') {
+        if (dot && txt) {
             dot.style.backgroundColor = '#92D050';
             txt.textContent = CLOUD_MODE_ENABLED ? 'Conectado a la Nube' : 'Modo Local';
             txt.style.color = '#25306B';
             txt.style.fontWeight = 'bold';
         }
-    }, 2000);
+    }
+
+    // Intentar actualizar después de 800ms (móvil espera rápido)
+    const connectionTimeoutId = setTimeout(updateConnectionStatus, 800);
 
     initIndexedDB(() => {
         clearTimeout(connectionTimeoutId);
+        updateConnectionStatus();
         setupEventListeners();
         setupAdminTabs();
         setupMatrixLogisticsDrivers();
