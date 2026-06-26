@@ -3675,14 +3675,18 @@ function renderMonitoringTable() {
         }
 
         const evMap = {}; evaluadores.forEach(e => evMap[e.rut] = e.nombre);
-        const scoresMap = {}; scores.forEach(s => { const k = `${s.rutEvaluador}_${s.cobertura}_${s.stage}`; if (!scoresMap[k]) scoresMap[k] = []; scoresMap[k].push(s); });
+        const scoresMap = {}; scores.forEach(s => {
+            const k = `${s.rutEvaluador}_${s.programa}_${s.provincia}_${s.stage}`;
+            if (!scoresMap[k]) scoresMap[k] = [];
+            scoresMap[k].push(s);
+        });
 
         monitoringData = [];
 
         asignaciones.forEach(asig => {
             const nom = evMap[asig.rut] || asig.rut;
             const cobLabel = buildCoberturaLabel(asig.programa, asig.provincia, asig.entidadNombre);
-            
+
             let parsedEtapas = asig.etapas;
             if (typeof parsedEtapas === 'string') {
                 parsedEtapas = parsedEtapas.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
@@ -3691,7 +3695,7 @@ function renderMonitoringTable() {
             }
 
             parsedEtapas.forEach(stg => {
-                const currentScores = scoresMap[`${asig.rut}_${cobLabel}_${stg}`] || [];
+                const currentScores = scoresMap[`${asig.rut}_${asig.programa}_${asig.provincia}_${stg}`] || [];
                 let sum = 0, count = 0, maxTs = 0, lastDateStr = "";
                 currentScores.forEach(s => { 
                     sum += (parseInt(s.score, 10) || 0); count++; 
@@ -3757,24 +3761,25 @@ function exportDatabaseToJSON() {
 
 /* ================= FUNCIONES DE REPORTES Y EXCEL ================= */
 function getReportesGroupedData(callback) {
-    dbGetAll('scores', (scores) => {
+    // Sincronizar desde Google Sheets (forceCloud = true) para tener datos actualizados
+    getMultipleStores(['scores'], ([scores]) => {
         const dataByEntidad = {};
         scores.forEach(s => {
             let ent = (s.entidad && s.entidad !== 'Sin Entidad') ? s.entidad : 'Sin Entidad Asociada';
             let prog = s.programa || 'Sin Programa';
             let nombreEv = s.nombreEvaluador || 'Sin Evaluador';
             let subKey = `Programa: ${prog} - Evaluador: ${nombreEv}`;
-            
+
             if (!dataByEntidad[ent]) dataByEntidad[ent] = { stages: {}, programs: {}, maxTs: 0, lastDate: "" };
-            
+
             let val = parseInt(s.score, 10) || 0;
             let stageNum = parseInt(s.stage, 10);
-            
+
             if (!dataByEntidad[ent].stages[stageNum]) dataByEntidad[ent].stages[stageNum] = [];
             dataByEntidad[ent].stages[stageNum].push(val);
-            
+
             let dTs = parseAnyDate(s.hora);
-            
+
             if (dTs > dataByEntidad[ent].maxTs) {
                 dataByEntidad[ent].maxTs = dTs;
                 dataByEntidad[ent].lastDate = s.hora;
@@ -3785,7 +3790,7 @@ function getReportesGroupedData(callback) {
             if (!dataByEntidad[ent].programs[subKey]) dataByEntidad[ent].programs[subKey] = { stages: {}, maxTs: 0, lastDate: "" };
             if (!dataByEntidad[ent].programs[subKey].stages[stageNum]) dataByEntidad[ent].programs[subKey].stages[stageNum] = [];
             dataByEntidad[ent].programs[subKey].stages[stageNum].push(val);
-            
+
             if (dTs > dataByEntidad[ent].programs[subKey].maxTs) {
                 dataByEntidad[ent].programs[subKey].maxTs = dTs;
                 dataByEntidad[ent].programs[subKey].lastDate = s.hora;
@@ -3794,7 +3799,7 @@ function getReportesGroupedData(callback) {
             }
         });
         callback(dataByEntidad);
-    });
+    }, true); // forceCloud: true para sincronizar desde Google Sheets
 }
 
 function calculateAveragesForReport(nodeData) {
