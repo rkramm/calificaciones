@@ -2294,12 +2294,21 @@ function renderAdminEntidadesColumn() {
         return;
     }
 
-    // Normalizar provincia a mayúsculas para comparación
-    const normalizadaProvincia = adminSelectedProvincia.toUpperCase();
+    // DEBUG
+    console.log('🔍 renderAdminEntidadesColumn DEBUG:');
+    console.log('  adminSelectedProvincia:', adminSelectedProvincia);
+    console.log('  savedPrograms:', savedPrograms);
+    console.log('  totalEntidades:', adminTemporaryEntidades.length);
+    console.log('  primera entidad:', adminTemporaryEntidades[0]);
+    console.log('  campos de entidad:', adminTemporaryEntidades[0] ? Object.keys(adminTemporaryEntidades[0]) : 'N/A');
 
-    let filteredEntidades = adminTemporaryEntidades.filter(ent =>
-        savedPrograms.includes(ent.programa) && ent.Provincia.toUpperCase() === normalizadaProvincia
-    );
+    // Solo filtrar por programa (sin provincia por ahora)
+    let filteredEntidades = adminTemporaryEntidades.filter(ent => {
+        const match = savedPrograms.includes(ent.programa);
+        return match;
+    });
+
+    console.log('  📊 Entidades después de filtro por programa:', filteredEntidades.length);
 
     // Deduplicar entidades por nombre - mostrar cada entidad solo una vez
     const uniqueEntidades = {};
