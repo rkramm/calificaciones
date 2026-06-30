@@ -2310,13 +2310,11 @@ function renderAdminEntidadesColumn() {
         return;
     }
 
-    // Agregar botón "Seleccionar todas" y lista de entidades con estilo normalizado
+    // Agregar "Marcar todas" y lista de entidades con estilo normalizado
     col.innerHTML = `
         <label style="display:flex; align-items:center; gap:6px; font-weight:bold; color:var(--primary-dark); cursor:pointer; font-size:0.75rem; margin-bottom:6px;">
-            <input type="checkbox"> [ Seleccionar Entidad ]
+            <input type="checkbox" id="chk-marcar-todas-entidades" onchange="document.querySelectorAll('.asig-entidad-chk').forEach(c => c.checked = this.checked)"> [ Marcar Todas ]
         </label>
-        <button type="button" onclick="document.querySelectorAll('.asig-entidad-chk').forEach(c => c.checked = true)" style="background:#0066BB; color:white; border:none; padding:6px 8px; border-radius:3px; font-size:0.7rem; width:100%; margin-bottom:4px; cursor:pointer; font-weight:bold;">✓ Seleccionar todas</button>
-        <button type="button" onclick="document.querySelectorAll('.asig-entidad-chk').forEach(c => c.checked = false)" style="background:#999; color:white; border:none; padding:6px 8px; border-radius:3px; font-size:0.7rem; width:100%; margin-bottom:6px; cursor:pointer; font-weight:bold;">✗ Deseleccionar todas</button>
     ` +
         filteredEntidades.map(ent => `<div class="checkbox-block-item"><label><input type="checkbox" class="asig-entidad-chk" value="${ent.idEntidad}" data-name="${ent.nombre}"> ${ent.nombre}</label></div>`).join('');
 }
