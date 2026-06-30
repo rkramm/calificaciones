@@ -3809,8 +3809,19 @@ function exportDatabaseToJSON() {
 
 /* ================= FUNCIONES DE REPORTES Y EXCEL ================= */
 function getReportesGroupedData(callback) {
-    // Sincronizar desde Google Sheets (forceCloud = true) para tener datos actualizados
-    getMultipleStores(['scores'], ([scores]) => {
+    // Descargar SIEMPRE desde Google Sheets - la nube es la fuente de verdad
+    cloudGet('scores').then(scores => {
+        scores = scores || [];
+        _processReportesData(callback, scores);
+    }).catch(err => {
+        console.warn('Error descargando scores desde Google Sheets, usando caché local:', err);
+        getMultipleStores(['scores'], ([scores]) => {
+            _processReportesData(callback, scores);
+        });
+    });
+}
+
+function _processReportesData(callback, scores) {
         const dataByEntidad = {};
         scores.forEach(s => {
             let ent = (s.entidad && s.entidad !== 'Sin Entidad') ? s.entidad : 'Sin Entidad Asociada';
@@ -3847,7 +3858,6 @@ function getReportesGroupedData(callback) {
             }
         });
         callback(dataByEntidad);
-    }, true); // forceCloud: true para sincronizar desde Google Sheets
 }
 
 function calculateAveragesForReport(nodeData) {
