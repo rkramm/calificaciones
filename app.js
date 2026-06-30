@@ -2294,20 +2294,9 @@ function renderAdminEntidadesColumn() {
         return;
     }
 
-    // DEBUG: Ver estructura de datos
-    console.log('DEBUG renderAdminEntidadesColumn:', {
-        adminSelectedProvincia,
-        savedPrograms,
-        totalEntidades: adminTemporaryEntidades.length,
-        primeraEntidad: adminTemporaryEntidades[0],
-        camposEntidad: adminTemporaryEntidades[0] ? Object.keys(adminTemporaryEntidades[0]) : []
-    });
-
     let filteredEntidades = adminTemporaryEntidades.filter(ent =>
-        savedPrograms.includes(ent.programa) && ent.provincia === adminSelectedProvincia
+        savedPrograms.includes(ent.programa) && ent.Provincia === adminSelectedProvincia
     );
-
-    console.log('Entidades filtradas:', filteredEntidades.length);
 
     // Deduplicar entidades por nombre - mostrar cada entidad solo una vez
     const uniqueEntidades = {};
