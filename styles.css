@@ -180,7 +180,7 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 
 @media (max-width: 768px) {
-    .table-scroll-container { max-height: calc(100vh - 250px); }
+    .table-scroll-container { max-height: none; overflow-y: visible; }
 }
 .evaluation-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
 .evaluation-table th, .evaluation-table td { border: 1px solid #E8EAED; padding: 8px 12px; vertical-align: middle; min-height: 28px; }
@@ -406,7 +406,7 @@ button { font-family: 'Segoe UI', sans-serif; }
 
     .evaluation-table { font-size: 0.75rem; }
     .evaluation-table th, .evaluation-table td { padding: 4px 6px; }
-    .table-scroll-container { max-height: calc(100vh - 250px); }
+    .table-scroll-container { max-height: none; overflow-y: visible; }
 
     /* En móvil, reducir altura de proyectos para dar más espacio a la tabla */
     #eval-projects-section { height: 120px !important; }
@@ -456,7 +456,7 @@ button { font-family: 'Segoe UI', sans-serif; }
     .evaluation-table th small { font-size: 0.65rem; }
 
     .modal-content { width: 95%; max-width: 100%; padding: 12px; }
-    .table-scroll-container { max-height: calc(100vh - 200px); }
+    .table-scroll-container { max-height: none; overflow-y: visible; }
 
     .login-card { padding: 30px 20px; max-width: 90%; }
     .login-header h2 { font-size: 1.4rem; }
@@ -805,8 +805,8 @@ button { font-family: 'Segoe UI', sans-serif; }
 }
 
 #evaluation-rows {
-    height: 80px;
-    overflow-y: auto;
+    height: auto;
+    overflow-y: visible;
 }
 
 /* Reducir espacio vertical entre filas en un 40% */
