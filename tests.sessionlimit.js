@@ -52,7 +52,12 @@ function runSessionLimitTest() {
             });
         } else {
             // Agregar a sesiones activas
-            ACTIVE_USER_SESSIONS.add(userRut);
+            ACTIVE_USER_SESSIONS.set(userRut, {
+                loginTime: Date.now(),
+                lastActivity: Date.now(),
+                lastWrite: Date.now(),
+                nombre: userRut
+            });
             const tiempoRespuesta = Date.now() - tiempoInicio;
             resultados.loginsExitosos++;
             resultados.loginsIntentados++;
