@@ -219,9 +219,14 @@ const STAGES_METADATA = {
 let currentUser = null, currentRole = null, currentStage = 1, currentCoverage = "", deadlineExpired = false;
 let dbInstance = null, dbItems = [], dbScores = {}, allMemoryScores = [], allAsignacionesMapped = [];
 
-// Control de sesiones simultáneas (máximo 7 usuarios)
-const MAX_CONCURRENT_USERS = 7;
-const ACTIVE_USER_SESSIONS = new Set();
+// Control de sesiones simultáneas (máximo 6 usuarios)
+const MAX_CONCURRENT_USERS = 6;
+const ACTIVE_USER_SESSIONS = new Map(); // RUT → {loginTime, lastActivity, lastWrite}
+const SESSION_TIMEOUT_MINUTES = 10;
+const INACTIVITY_TIMEOUT_MS = SESSION_TIMEOUT_MINUTES * 60 * 1000;
+
+// Rastrear timeouts de inactividad por usuario
+const userInactivityTimers = {};
 
 // Estado del módulo histórico
 let historicoConfig = null;
@@ -709,6 +714,7 @@ async function cloudSave(table, dataArray, mode = 'incremental', options = {}) {
             if (result?.success && typeof result.serverVersion === 'number') {
                 serverVersions[table] = result.serverVersion;
                 SYNC_MANAGER.registerPending(table, 0);
+                updateLastWriteTime(); // Registrar escritura al servidor
                 return result;
             }
 
@@ -2657,20 +2663,42 @@ async function attemptEvaluatorLogin(evaluadores, userInput, passInput) {
 
     // ⏳ VERIFICAR LÍMITE DE USUARIOS SIMULTÁNEOS (LOCAL)
     if (ACTIVE_USER_SESSIONS.size >= MAX_CONCURRENT_USERS) {
-        alert(`⚠️ Sistema saturado (${ACTIVE_USER_SESSIONS.size}/${MAX_CONCURRENT_USERS} usuarios).\n\nIntente en algunos minutos.`);
+        alert(`⚠️ SISTEMA SATURADO\n\n❌ Se alcanzó el máximo de ${MAX_CONCURRENT_USERS} usuarios simultáneos.\n\n⏰ Por favor, intente de nuevo en 5 minutos.\n\nSi tiene problemas, contacte al administrador.\n\nUsuarios conectados: ${ACTIVE_USER_SESSIONS.size}/${MAX_CONCURRENT_USERS}`);
         restoreConnectionStatus();
         return;
     }
 
-    // Agregar usuario a sesiones activas
-    ACTIVE_USER_SESSIONS.add(userInput);
+    // Agregar usuario a sesiones activas con metadata
+    const ahora = Date.now();
+    ACTIVE_USER_SESSIONS.set(userInput, {
+        loginTime: ahora,
+        lastActivity: ahora,
+        lastWrite: ahora,
+        nombre: evResult.nombre || userInput
+    });
     console.log(`✅ Usuario ${userInput} agregado. Sesiones activas: ${ACTIVE_USER_SESSIONS.size}/${MAX_CONCURRENT_USERS}`);
+
+    // Configurar timeout de inactividad (10 minutos)
+    if (userInactivityTimers[userInput]) {
+        clearTimeout(userInactivityTimers[userInput]);
+    }
+    userInactivityTimers[userInput] = setTimeout(() => {
+        if (currentUser && currentUser.rut === userInput) {
+            console.warn(`⏰ Sesión expirada por inactividad: ${userInput}`);
+            alert(`⏰ Su sesión ha expirado por inactividad.\n\nPor seguridad, las sesiones se cierran después de ${SESSION_TIMEOUT_MINUTES} minutos sin movimiento.`);
+            handleLogout();
+        }
+    }, INACTIVITY_TIMEOUT_MS);
 
     // Generar CSRF token para esta sesión
     generateCSRFToken();
 
     currentUser = evResult;
     currentRole = 'evaluador';
+
+    // Actualizar actividad cuando el usuario interactúa
+    document.addEventListener('click', resetActivityTimer);
+    document.addEventListener('keypress', resetActivityTimer);
 
     try {
         // 🔄 PRIORIDAD 1: Descargar asignaciones FRESCAS de Google Sheets
@@ -3032,10 +3060,59 @@ function handleLogout() {
     performLogout();
 }
 
+/**
+ * Resetea el timer de inactividad cuando hay movimiento
+ */
+function resetActivityTimer() {
+    if (!currentUser || !currentUser.rut) return;
+
+    const userRut = currentUser.rut;
+
+    // Actualizar último movimiento
+    if (ACTIVE_USER_SESSIONS.has(userRut)) {
+        const session = ACTIVE_USER_SESSIONS.get(userRut);
+        session.lastActivity = Date.now();
+        ACTIVE_USER_SESSIONS.set(userRut, session);
+    }
+
+    // Resetear timer de inactividad
+    if (userInactivityTimers[userRut]) {
+        clearTimeout(userInactivityTimers[userRut]);
+    }
+
+    userInactivityTimers[userRut] = setTimeout(() => {
+        if (currentUser && currentUser.rut === userRut) {
+            console.warn(`⏰ Sesión expirada por inactividad: ${userRut}`);
+            alert(`⏰ Su sesión ha expirado por inactividad.\n\nPor seguridad, las sesiones se cierran después de ${SESSION_TIMEOUT_MINUTES} minutos sin movimiento.`);
+            handleLogout();
+        }
+    }, INACTIVITY_TIMEOUT_MS);
+}
+
+/**
+ * Actualiza cuando hay escritura en servidor
+ */
+function updateLastWriteTime() {
+    if (!currentUser || !currentUser.rut) return;
+
+    if (ACTIVE_USER_SESSIONS.has(currentUser.rut)) {
+        const session = ACTIVE_USER_SESSIONS.get(currentUser.rut);
+        session.lastWrite = Date.now();
+        ACTIVE_USER_SESSIONS.set(currentUser.rut, session);
+    }
+}
+
 function performLogout() {
     // Remover usuario de sesiones activas
     if (currentUser && currentUser.rut) {
         ACTIVE_USER_SESSIONS.delete(currentUser.rut);
+
+        // Limpiar timer de inactividad
+        if (userInactivityTimers[currentUser.rut]) {
+            clearTimeout(userInactivityTimers[currentUser.rut]);
+            delete userInactivityTimers[currentUser.rut];
+        }
+
         console.log(`❌ Usuario ${currentUser.rut} removido. Sesiones activas: ${ACTIVE_USER_SESSIONS.size}/${MAX_CONCURRENT_USERS}`);
     }
 
