@@ -681,6 +681,44 @@ const SYNC_MANAGER = {
 };
 
 /**
+ * Actualizar etiqueta de estado de guardado
+ * Muestra "PENDIENTE" si hay datos sin guardar, "GUARDADO" si todo está sincronizado
+ */
+function updateSaveStatus() {
+    const badge = document.getElementById('save-status-badge');
+    if (!badge) return;
+
+    // Contar total de datos pendientes en todas las tablas
+    const totalPending = Object.values(SYNC_MANAGER.pendingByTable).reduce((sum, count) => sum + (count || 0), 0);
+
+    if (totalPending > 0) {
+        badge.textContent = '⏳ PENDIENTE';
+        badge.style.background = '#FF9800';
+        badge.style.color = 'white';
+        badge.style.display = 'inline-block';
+    } else {
+        badge.textContent = '✅ GUARDADO';
+        badge.style.background = '#2E8B57';
+        badge.style.color = 'white';
+        badge.style.display = 'inline-block';
+    }
+}
+
+/**
+ * Iniciar monitoreo del estado de guardado
+ * Actualiza cada 500ms
+ */
+function initSaveStatusMonitor() {
+    // Actualizar inicial
+    updateSaveStatus();
+
+    // Monitorear cambios cada 500ms
+    setInterval(updateSaveStatus, 500);
+
+    console.log('💡 Monitor de estado de guardado iniciado');
+}
+
+/**
  * Guarda datos con reintentos ligeros y sync adaptativo
  * Optimizado para múltiples usuarios simultáneos
  */
@@ -1541,6 +1579,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupAdminTabs();
         setupMatrixLogisticsDrivers();
         checkDeadlineStatus();
+        initSaveStatusMonitor(); // Monitorear estado de guardado
     });
 });
 

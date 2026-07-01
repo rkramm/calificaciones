@@ -93,9 +93,12 @@
                     <div style="font-size: 0.85rem; color: rgba(255, 255, 255, 0.85); font-weight: 600;"><span id="header-countdown">--:--</span></div>
                 </div>
 
-                <div style="order: 3; display: flex; gap: 8px; align-items: center; flex: 1 1 0; justify-content: flex-end;">
+                <div style="order: 3; display: flex; gap: 8px; align-items: flex-start; flex: 1 1 0; justify-content: flex-end;">
                     <button id="btn-eval-pdf" class="btn btn-primary hidden" style="background-color: #3C4350; color: white; font-weight: 600; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); padding: 8px 12px; font-size: 0.85rem;" title="Exportar calificaciones a formato PDF para respaldo">🖨️ PDF</button>
-                    <button id="btn-save-scores" class="btn btn-primary hidden" style="background-color: #0A3A6B; color: white; font-weight: 600; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); padding: 8px 12px; font-size: 0.85rem;">💾 Guardar</button>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                        <button id="btn-save-scores" class="btn btn-primary hidden" style="background-color: #0A3A6B; color: white; font-weight: 600; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); padding: 8px 12px; font-size: 0.85rem;">💾 Guardar</button>
+                        <span id="save-status-badge" style="font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: #2E8B57; color: white; display: none; letter-spacing: 0.03em;">✅ GUARDADO</span>
+                    </div>
                     <button id="btn-sync-cloud" class="btn btn-primary" style="background-color: #2E8B57; color: white; font-weight: 600; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); padding: 8px 12px; font-size: 0.85rem;">☁️ Sincronizar</button>
                     <button id="btn-download-cloud" class="btn btn-primary" style="background-color: #2B7A99; color: white; font-weight: 600; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); padding: 8px 12px; font-size: 0.85rem;" title="Descargar asignaciones desde la nube">⬇️ Descargar</button>
                     <button id="btn-logout" class="btn btn-danger" style="background-color: #C0392B; color: white; padding: 8px 12px; font-size: 0.85rem; font-weight: 600; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🚪 Salir</button>
