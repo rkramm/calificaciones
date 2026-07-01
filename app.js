@@ -850,7 +850,11 @@ function updateDeadlineDisplay() {
     if (!DEADLINE) return;
 
     const display = document.getElementById('deadline-display');
-    if (!display) return;
+    const container = document.getElementById('deadline-container');
+    if (!display || !container) return;
+
+    // Mostrar el contenedor
+    container.style.display = 'block';
 
     const ahora = new Date();
 
