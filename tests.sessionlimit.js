@@ -85,7 +85,6 @@ function runSessionLimitTest() {
     console.log(`   • Intentos de login: ${resultados.loginsIntentados}`);
     console.log(`   • Logins exitosos: ${resultados.loginsExitosos}/${SESSION_LIMIT_TEST_CONFIG.maxUsuarios}`);
     console.log(`   • Logins rechazados: ${resultados.loginsRechazados}`);
-    console.log(`   • Tiempo promedio: ${Math.round(resultados.tiempos.reduce((a, b) => a + b) / resultados.tiempos.length)}ms`);
 
     console.log(`\n📋 Validación de Límite:`);
     const limitOk = resultados.loginsExitosos === SESSION_LIMIT_TEST_CONFIG.maxUsuarios && resultados.loginsRechazados === 1;
