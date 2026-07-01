@@ -195,7 +195,7 @@ function doPost(e) {
       // ÚLTIMO RECURSO: obtener de dataArray solo si la hoja estaba vacía
       headers = Object.keys(dataArray[0]);
     }
-    
+
     if (mode === 'replace') {
       // Modo 'replace': LIMPIAR Y REEMPLAZAR DATOS (mantener headers)
       const lastRow = sheet.getLastRow();
@@ -222,14 +222,14 @@ function doPost(e) {
     } else {
       // Modo incremental: actualizar/agregar por clave primaria, NUNCA borrar
       const keyField = getKeyField(tableName);
-      
+
       // Asegurar headers iniciales si la hoja está vacía
       const initialValues = sheet.getDataRange().getDisplayValues();
       if (initialValues.length === 0 || (initialValues.length === 1 && initialValues[0].length === 1 && initialValues[0][0] === '')) {
         sheet.clearContents();
         if (headers) sheet.appendRow(headers);
       }
-      
+
       if (dataArray && dataArray.length > 0) {
         const refreshedValues = sheet.getDataRange().getDisplayValues();
         const refreshedHeaders = refreshedValues.length > 0 ? refreshedValues[0] : headers;
@@ -262,7 +262,7 @@ function doPost(e) {
         });
       }
     }
-    
+
     // Incrementar versión del servidor tras escritura exitosa (reutiliza versionData ya leído)
     const newServerVersion = bumpTableVersion(tableName, versionData);
 
@@ -295,11 +295,11 @@ function createBackupSheet() {
     const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
     const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
     const backupName = 'backup_' + timestamp;
-    
+
     // Crear hoja de respaldo
     const backupSheet = spreadsheet.insertSheet(backupName);
     backupSheet.appendRow(['Tabla', 'Datos JSON']);
-    
+
     const tables = ['configuracion', 'entidades', 'evaluadores', 'asignaciones', 'items', 'scores', 'historicos', 'asigna_historico'];
     tables.forEach(tableName => {
       const sheet = spreadsheet.getSheetByName(tableName);
@@ -308,7 +308,7 @@ function createBackupSheet() {
         backupSheet.appendRow([tableName, JSON.stringify(values)]);
       }
     });
-    
+
     return backupName;
   } catch (error) {
     console.error('Error creando backup:', error);
