@@ -3,7 +3,7 @@ const VERSION_SHEET_NAME = '__version__';
 
 // Control de sesiones concurrentes
 const MAX_CONCURRENT_USERS = 6;
-let ACTIVE_SESSIONS = {};
+const PROPERTIES = PropertiesService.getScriptProperties();
 
 // Manejar CORS preflight requests (Chrome y navegadores modernos)
 function doOptions(e) {
@@ -75,6 +75,9 @@ function doPost(e) {
 
     // Manejar login
     if (action === 'login') {
+      // Leer sesiones activas desde PropertiesService
+      const sessionsJson = PROPERTIES.getProperty('ACTIVE_SESSIONS') || '{}';
+      const ACTIVE_SESSIONS = JSON.parse(sessionsJson);
       const activeSessions = Object.keys(ACTIVE_SESSIONS).length;
 
       if (activeSessions >= MAX_CONCURRENT_USERS) {
@@ -90,6 +93,9 @@ function doPost(e) {
         lastActivity: new Date().getTime()
       };
 
+      // Guardar sesiones actualizadas
+      PROPERTIES.setProperty('ACTIVE_SESSIONS', JSON.stringify(ACTIVE_SESSIONS));
+
       return ContentService.createTextOutput(JSON.stringify({
         success: true,
         message: `Login exitoso. ${activeSessions + 1}/${MAX_CONCURRENT_USERS} usuarios conectados.`
@@ -98,7 +104,15 @@ function doPost(e) {
 
     // Manejar logout
     if (action === 'logout') {
+      // Leer sesiones activas desde PropertiesService
+      const sessionsJson = PROPERTIES.getProperty('ACTIVE_SESSIONS') || '{}';
+      const ACTIVE_SESSIONS = JSON.parse(sessionsJson);
+
       delete ACTIVE_SESSIONS[userRut];
+
+      // Guardar sesiones actualizadas
+      PROPERTIES.setProperty('ACTIVE_SESSIONS', JSON.stringify(ACTIVE_SESSIONS));
+
       return ContentService.createTextOutput(JSON.stringify({
         success: true,
         message: 'Logout completado'
@@ -106,8 +120,14 @@ function doPost(e) {
     }
 
     // Registrar actividad (para timeout de inactividad después)
-    if (userRut && ACTIVE_SESSIONS[userRut]) {
-      ACTIVE_SESSIONS[userRut].lastActivity = new Date().getTime();
+    if (userRut) {
+      const sessionsJson = PROPERTIES.getProperty('ACTIVE_SESSIONS') || '{}';
+      const ACTIVE_SESSIONS = JSON.parse(sessionsJson);
+
+      if (ACTIVE_SESSIONS[userRut]) {
+        ACTIVE_SESSIONS[userRut].lastActivity = new Date().getTime();
+        PROPERTIES.setProperty('ACTIVE_SESSIONS', JSON.stringify(ACTIVE_SESSIONS));
+      }
     }
 
     const tableName = payload.table;
