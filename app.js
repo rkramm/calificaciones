@@ -634,35 +634,70 @@ async function cloudGetProjects(programa, entidad = '') {
     }
 }
 
+/**
+ * Guarda datos con reintentos automáticos y backoff exponencial
+ * Maneja conflictos de versión de forma silenciosa sin afectar la UX
+ */
 async function cloudSave(table, dataArray, mode = 'incremental', options = {}) {
-    try {
-        const clientVersion = serverVersions[table] || 1;
-        const body = {
-            table,
-            data: dataArray,
-            mode,
-            clientVersion,
-            csrfToken: csrfToken, // CSRF token
-            sessionId: currentUser?.rut || 'guest' // Session ID para validar CSRF en GAS
-        };
-        if (options.forceVersion) {
-            body.forceVersion = true;
+    const MAX_REINTENTOS = 3;
+    const DELAY_INICIAL = 300; // ms
+
+    for (let intento = 0; intento <= MAX_REINTENTOS; intento++) {
+        try {
+            const clientVersion = serverVersions[table] || 1;
+            const body = {
+                table,
+                data: dataArray,
+                mode,
+                clientVersion,
+                csrfToken: csrfToken,
+                sessionId: currentUser?.rut || 'guest'
+            };
+            if (options.forceVersion) {
+                body.forceVersion = true;
+            }
+
+            const response = await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(body)
+            });
+            const result = await response.json();
+
+            // Actualizar versión si fue exitoso
+            if (result?.success && typeof result.serverVersion === 'number') {
+                serverVersions[table] = result.serverVersion;
+                return result;
+            }
+
+            // Manejar conflicto de versión: reintentar con backoff exponencial
+            if (result?.versionConflict && intento < MAX_REINTENTOS) {
+                const delayMs = DELAY_INICIAL * Math.pow(2, intento); // 300ms, 600ms, 1200ms
+                console.warn(`⏳ Conflicto de versión en ${table}. Reintentando en ${delayMs}ms (intento ${intento + 1}/${MAX_REINTENTOS})...`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                continue; // Reintentar con nueva versión
+            }
+
+            // Si no es conflicto o fue el último intento, retornar resultado
+            if (result?.versionConflict) {
+                console.error(`❌ Conflicto de versión persistente en ${table} después de ${MAX_REINTENTOS} reintentos`);
+            }
+            return result || { success: false, error: 'Sin respuesta del servidor' };
+
+        } catch (error) {
+            // Error de red/conexión
+            if (intento < MAX_REINTENTOS) {
+                const delayMs = DELAY_INICIAL * Math.pow(2, intento);
+                console.warn(`⏳ Error de conexión. Reintentando en ${delayMs}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                continue;
+            }
+            console.error(`❌ Error guardando en tabla ${table} después de ${MAX_REINTENTOS} reintentos:`, error.message);
+            return { success: false, error: error.message };
         }
-        // Enviar como texto plano (text/plain) evita que el navegador bloquee la solicitud por CORS
-        const response = await fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify(body)
-        });
-        const result = await response.json();
-        if (result && typeof result.serverVersion === 'number') {
-            serverVersions[table] = result.serverVersion;
-        }
-        return result;
-    } catch (error) {
-        console.error(`Error guardando en tabla ${table}:`, error);
-        return { success: false, error: error.message };
     }
+
+    return { success: false, error: 'Máximo de reintentos excedido' };
 }
 
 /**
