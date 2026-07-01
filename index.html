@@ -113,6 +113,7 @@
                 <button class="tab-button admin-main-tab" data-target="panel-reportes" id="btn-tab-reportes">Reportes Consolidados</button>
                 <button class="tab-button admin-main-tab" data-target="panel-textos">Edición de Textos</button>
                 <button class="tab-button admin-main-tab" data-target="panel-historicos">Históricos</button>
+                <button class="tab-button admin-main-tab" data-target="panel-sesiones">Sesiones Activas</button>
             </div>
 
             <div id="panel-config" class="admin-subpanel" title="Panel de Configuración y Asignación">
@@ -418,6 +419,20 @@
                     </div>
                 </div>
             </div>
+
+            <div id="panel-sesiones" class="admin-subpanel hidden" title="Panel de Sesiones Activas">
+                <div class="card compact-card" title="Tarjeta de Sesiones Activas">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px; border-bottom:2px solid var(--primary-dark); padding-bottom:4px;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <h3 style="color:var(--primary-dark); font-size:1.1rem; margin:0;">Sesiones Activas de Usuarios</h3>
+                            <span style="background:#5C6580;color:#fff;padding:3px 9px;border-radius:4px;font-size:0.66rem;font-weight:700;letter-spacing:0.03em;">SESIONES</span>
+                        </div>
+                    </div>
+                    <div id="admin-sessions-list" style="font-size:0.9rem; color:#666;">
+                        <p style="text-align:center; padding:20px; color:#999;">Cargando sesiones...</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="evaluador-view" class="hidden" style="display: flex; flex-direction: column; height: 100vh; gap: 0;">
@@ -697,5 +712,6 @@
     <script src="tests.load8users.scores.js"></script>
     <script src="tests.load8users.sheets.js"></script>
     <script src="tests.debug.login.js"></script>
+    <script src="admin-sessions.js"></script>
 </body>
 </html>
