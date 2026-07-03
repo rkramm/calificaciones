@@ -4300,8 +4300,13 @@ function processAsignacionStaging(isPartialSave) {
     });
 
     const etapas = [];
-    document.querySelectorAll('.asig-etapa-chk:checked').forEach(c => etapas.push(parseInt(c.value, 10)));
+    document.querySelectorAll('.asig-etapa-chk:checked').forEach(c => {
+        const val = parseInt(c.value, 10);
+        console.log(`📋 Checkbox etapa - value="${c.value}" → parseInt=${val}`);
+        etapas.push(val);
+    });
     etapas.sort((a, b) => a - b);
+    console.log(`✅ Etapas finales seleccionadas:`, etapas);
 
     let totalCoveragesList = [];
     for (const [provincia, programas] of Object.entries(adminTemporaryLogisticaMap)) {
@@ -4344,6 +4349,7 @@ function processAsignacionStaging(isPartialSave) {
             return;
         } else {
             currentScreenStaging = { ruts: selectedEvaluatorsRuts, names: selectedEvaluatorsNames, etapas, coberturas: combinedCoverages };
+            console.log(`📝 currentScreenStaging creado:`, { etapas: currentScreenStaging.etapas });
         }
     }
 
@@ -4383,11 +4389,17 @@ function executeCommitAsignacion() {
     const store = tx.objectStore('asignaciones');
 
     const writeOps = () => {
-        allToSave.forEach(p => {
+        allToSave.forEach((p, idx) => {
+            console.log(`🔍 Guardando asignación ${idx}:`, {
+                etapasArray: p.etapas,
+                etapasType: typeof p.etapas,
+                isArray: Array.isArray(p.etapas)
+            });
             p.ruts.forEach(rut => {
                 p.coberturas.forEach(c => {
                     // Convertir etapas a string para que Google Sheets no las guarde como objetos Java
                     const etapasStr = Array.isArray(p.etapas) ? p.etapas.join(',') : p.etapas;
+                    console.log(`💾 Guardando etapas como string: "${etapasStr}"`);
                     store.put({ idAsig: `${rut}_${c.programa}_${c.provincia.replace(/\s+/g, '')}_${c.entidadId || 'none'}`, rut, programa: c.programa, provincia: c.provincia, entidadId: c.entidadId, entidadNombre: c.entidadNombre, etapas: etapasStr });
                 });
             });
@@ -5657,8 +5669,13 @@ function saveAsignacionHistorica() {
     });
 
     const etapas = [];
-    document.querySelectorAll('.asig-etapa-chk:checked').forEach(c => etapas.push(parseInt(c.value, 10)));
+    document.querySelectorAll('.asig-etapa-chk:checked').forEach(c => {
+        const val = parseInt(c.value, 10);
+        console.log(`📋 Checkbox etapa - value="${c.value}" → parseInt=${val}`);
+        etapas.push(val);
+    });
     etapas.sort((a, b) => a - b);
+    console.log(`✅ Etapas finales seleccionadas:`, etapas);
 
     let totalCoveragesList = [];
     for (const [provincia, programas] of Object.entries(adminTemporaryLogisticaMap)) {
