@@ -221,6 +221,8 @@ let dbInstance = null, dbItems = [], dbScores = {}, allMemoryScores = [], allAsi
 let DEADLINE = null; // Fecha límite cargada desde configuración
 let sessionStartTime = null; // Hora de inicio de sesión
 let sessionCountdownInterval = null; // Interval para el countdown de sesión
+let currentEntityPage = 1; // Página actual de paginación de entidades
+const ENTITIES_PER_PAGE = 4; // Máximo de entidades por página
 const SESSION_DURATION_MS = 10 * 60 * 1000; // 10 minutos
 
 // Control de sesiones simultáneas (máximo 6 usuarios)
@@ -3548,8 +3550,9 @@ function renderCoverageTabs() {
                 const programa = cobertura ? cobertura.split(' - ')[0] : 'DS10';
                 badgeEl.textContent = programa;
             }
-            // Resetear entidad seleccionada
+            // Resetear entidad seleccionada y página de paginación
             window.currentSelectedEntity = null;
+            currentEntityPage = 1;
             const conf = allAsignacionesMapped.find(a => a.cobertura === currentCoverage);
             currentStage = (conf && conf.etapas && conf.etapas.length > 0) ? conf.etapas[0] : 1;
             renderCoverageTabs();
@@ -3595,11 +3598,32 @@ function renderEvaluatorHeaderInfo() {
         window.currentSelectedEntity = entityName;
     }
 
-    // Renderizar pestañas de entidades SIEMPRE
+    // Renderizar pestañas de entidades CON PAGINACIÓN
     const tabsContainer = document.getElementById('eval-entity-tabs-container');
+    const paginationEl = document.getElementById('eval-entity-pagination');
+    const paginationInfoEl = document.getElementById('pagination-info');
+
     if (tabsContainer) {
         tabsContainer.innerHTML = '';
-        uniqueEntities.forEach(entidadNombre => {
+
+        // Calcular paginación
+        const totalPages = Math.ceil(uniqueEntities.length / ENTITIES_PER_PAGE);
+
+        // Validar página actual
+        if (currentEntityPage > totalPages) {
+            currentEntityPage = totalPages || 1;
+        }
+        if (currentEntityPage < 1) {
+            currentEntityPage = 1;
+        }
+
+        // Obtener entidades para la página actual
+        const startIdx = (currentEntityPage - 1) * ENTITIES_PER_PAGE;
+        const endIdx = startIdx + ENTITIES_PER_PAGE;
+        const pageEntities = uniqueEntities.slice(startIdx, endIdx);
+
+        // Renderizar botones de entidades de la página actual
+        pageEntities.forEach(entidadNombre => {
             const btn = document.createElement('button');
             btn.className = `tab-button ${window.currentSelectedEntity === entidadNombre ? 'active' : ''}`;
             btn.textContent = entidadNombre;
@@ -3613,6 +3637,46 @@ function renderEvaluatorHeaderInfo() {
             };
             tabsContainer.appendChild(btn);
         });
+
+        // Mostrar/ocultar paginación
+        if (paginationEl) {
+            if (uniqueEntities.length > ENTITIES_PER_PAGE) {
+                paginationEl.style.display = 'block';
+                if (paginationInfoEl) {
+                    paginationInfoEl.textContent = `${currentEntityPage}/${totalPages}`;
+                }
+
+                // Configurar botones de navegación
+                const btnPrev = document.getElementById('btn-prev-entity');
+                const btnNext = document.getElementById('btn-next-entity');
+
+                if (btnPrev) {
+                    btnPrev.disabled = currentEntityPage === 1;
+                    btnPrev.style.opacity = currentEntityPage === 1 ? '0.5' : '1';
+                    btnPrev.style.cursor = currentEntityPage === 1 ? 'not-allowed' : 'pointer';
+                    btnPrev.onclick = () => {
+                        if (currentEntityPage > 1) {
+                            currentEntityPage--;
+                            renderEvaluatorHeaderInfo();
+                        }
+                    };
+                }
+
+                if (btnNext) {
+                    btnNext.disabled = currentEntityPage === totalPages;
+                    btnNext.style.opacity = currentEntityPage === totalPages ? '0.5' : '1';
+                    btnNext.style.cursor = currentEntityPage === totalPages ? 'not-allowed' : 'pointer';
+                    btnNext.onclick = () => {
+                        if (currentEntityPage < totalPages) {
+                            currentEntityPage++;
+                            renderEvaluatorHeaderInfo();
+                        }
+                    };
+                }
+            } else {
+                paginationEl.style.display = 'none';
+            }
+        }
     }
 
     // Buscar asignaciones para la entidad seleccionada EN LA COBERTURA ACTUAL (no todas las coberturas)
