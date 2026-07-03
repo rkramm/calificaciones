@@ -730,19 +730,19 @@ function initSaveStatusMonitor() {
 
 /**
  * Parsea y normaliza etapas de una asignación
- * @param {string|array} etapas - Etapas como string "1,2,3" o array [1,2,3]
+ * @param {string|array} etapas - Etapas como string "1|2|3" o "1,2,3" (compatibilidad) o array [1,2,3]
  * @returns {array} Array de números [1,2,3] siempre válido, mínimo [1]
  */
 function parseAsignacionEtapas(etapas) {
     let parsedEtapas = etapas;
     if (typeof parsedEtapas === 'string') {
-        // Detectar y corregir valores corruptos como "2006", "2003", etc. (probablemente concatenación accidental con año)
-        // Las etapas válidas son 1-6, cualquier valor > 99 probablemente sea corrupto
-        parsedEtapas = parsedEtapas.split(',')
+        // Detectar separador: usar | (pipe) primero, luego , (coma) para compatibilidad
+        const separator = parsedEtapas.includes('|') ? '|' : ',';
+        parsedEtapas = parsedEtapas.split(separator)
             .map(n => {
                 const num = parseInt(n.trim(), 10);
                 // Si el número es > 100, probablemente sea "200X" (concatenación con año)
-                // Extraer el último dígito o los dos últimos dígitos relevantes
+                // Esto puede ocurrir con datos antiguos guardados mal
                 if (num > 100) {
                     // Intentar extraer la etapa (1-6) del número corrupto
                     const lastDigit = num % 10;
@@ -1318,16 +1318,16 @@ function normalizeAsignaciones(asignaciones) {
         if (typeof asig.etapas === 'string' && asig.etapas.includes('[Ljava.lang.Object')) {
             // Fallback a etapas default
             console.warn('⚠️ Asignación con etapas inválidas:', asig.idAsig, asig.etapas);
-            asig.etapas = '1,2,3,4,5,6';
+            asig.etapas = '1|2|3|4|5|6';
         }
-        // Si etapas es un array, convertir a string
+        // Si etapas es un array, convertir a string con separador |
         else if (Array.isArray(asig.etapas)) {
-            asig.etapas = asig.etapas.join(',');
+            asig.etapas = asig.etapas.join('|');
         }
         // Si no es string ni array, usar default
         else if (typeof asig.etapas !== 'string') {
             console.warn('⚠️ Etapas inválidas para:', asig.idAsig);
-            asig.etapas = '1,2,3,4,5,6';
+            asig.etapas = '1|2|3|4|5|6';
         }
         return asig;
     });
@@ -2339,12 +2339,14 @@ window.deleteAsignacionWithOptions = function(rut, nombre, cobertura, stageNum, 
             // Eliminar la etapa del array de etapas
             let etapasArray = asig.etapas;
             if (typeof etapasArray === 'string') {
-                etapasArray = etapasArray.split(',').map(Number);
+                // Detectar separador: | (nuevo) o , (antiguo para compatibilidad)
+                const separator = etapasArray.includes('|') ? '|' : ',';
+                etapasArray = etapasArray.split(separator).map(Number);
             }
 
             if (Array.isArray(etapasArray)) {
                 etapasArray = etapasArray.filter(e => e !== stageNum);
-                asig.etapas = etapasArray.join(','); // Guardar como string
+                asig.etapas = etapasArray.join('|'); // Guardar como string con separador |
 
                 const tx = dbInstance.transaction(['asignaciones'], 'readwrite');
                 tx.objectStore('asignaciones').put(asig);
@@ -4386,8 +4388,8 @@ function executeCommitAsignacion() {
         allToSave.forEach(p => {
             p.ruts.forEach(rut => {
                 p.coberturas.forEach(c => {
-                    // Convertir etapas a string para que Google Sheets no las guarde como objetos Java
-                    const etapasStr = Array.isArray(p.etapas) ? p.etapas.join(',') : p.etapas;
+                    // Convertir etapas a string usando | como separador (más seguro que comas)
+                    const etapasStr = Array.isArray(p.etapas) ? p.etapas.join('|') : p.etapas;
                     store.put({ idAsig: `${rut}_${c.programa}_${c.provincia.replace(/\s+/g, '')}_${c.entidadId || 'none'}`, rut, programa: c.programa, provincia: c.provincia, entidadId: c.entidadId, entidadNombre: c.entidadNombre, etapas: etapasStr });
                 });
             });
@@ -5702,7 +5704,7 @@ function saveAsignacionHistorica() {
         provincia: c.provincia,
         entidadId: c.entidadId || '',
         entidadNombre: c.entidadNombre,
-        etapas: etapas.join(',')
+        etapas: etapas.join('|')
     }));
 
     // Guardar localmente en IndexedDB
