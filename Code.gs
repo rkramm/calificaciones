@@ -244,7 +244,13 @@ function doPost(e) {
           }
           return val;
         }));
-        sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+        const range = sheet.getRange(2, 1, rows.length, headers.length);
+        range.setValues(rows);
+        // Forzar formato texto en columna de etapas para evitar interpretación numérica
+        const etapasColIndex = headers.indexOf('etapas') + 1;
+        if (etapasColIndex > 0) {
+          sheet.getRange(2, etapasColIndex, rows.length, 1).setNumberFormat('@');
+        }
       }
       // Si dataArray está vacío, simplemente no agrega nada (los headers permanecen)
     } else {
@@ -286,10 +292,22 @@ function doPost(e) {
           });
           if (rowMap[keyValue] !== undefined) {
             // Actualizar fila existente
-            sheet.getRange(rowMap[keyValue] + 1, 1, 1, rowData.length).setValues([rowData]);
+            const range = sheet.getRange(rowMap[keyValue] + 1, 1, 1, rowData.length);
+            range.setValues([rowData]);
+            // Forzar formato texto en columna de etapas
+            const etapasColIndex = refreshedHeaders.indexOf('etapas') + 1;
+            if (etapasColIndex > 0) {
+              sheet.getRange(rowMap[keyValue] + 1, etapasColIndex, 1, 1).setNumberFormat('@');
+            }
           } else {
             // Agregar nueva fila al final
             sheet.appendRow(rowData);
+            // Forzar formato texto en columna de etapas
+            const lastRow = sheet.getLastRow();
+            const etapasColIndex = refreshedHeaders.indexOf('etapas') + 1;
+            if (etapasColIndex > 0) {
+              sheet.getRange(lastRow, etapasColIndex, 1, 1).setNumberFormat('@');
+            }
           }
         });
       }
