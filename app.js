@@ -4457,12 +4457,8 @@ function _renderMonitoringTableData(asignaciones, evaluadores, scores) {
             const nom = evMap[asig.rut] || asig.rut;
             const cobLabel = buildCoberturaLabel(asig.programa, asig.provincia, asig.entidadNombre);
 
-            let parsedEtapas = asig.etapas;
-            if (typeof parsedEtapas === 'string') {
-                parsedEtapas = parsedEtapas.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
-            } else if (!Array.isArray(parsedEtapas)) {
-                parsedEtapas = [1];
-            }
+            // Usar la función mejorada parseAsignacionEtapas que detecta valores corruptos
+            const parsedEtapas = parseAsignacionEtapas(asig.etapas);
 
             parsedEtapas.forEach(stg => {
                 const currentScores = scoresMap[`${asig.rut}_${asig.programa}_${asig.provincia}_${stg}`] || [];
