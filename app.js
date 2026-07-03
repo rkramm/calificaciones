@@ -1995,6 +1995,16 @@ function setupEventListeners() {
 
     addManagedListener(document.getElementById('btn-login'), 'click', handleLogin);
 
+    // Permitir login al presionar Enter en el campo de contraseña
+    const passwordInput = document.getElementById('password');
+    if (passwordInput) {
+        addManagedListener(passwordInput, 'keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
+        });
+    }
+
     const btnCloseNotif = document.getElementById('btn-close-notifications');
     if (btnCloseNotif) {
         addManagedListener(btnCloseNotif, 'click', () => {
