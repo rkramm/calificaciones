@@ -2190,21 +2190,29 @@ function renderEntidadesAgregadas() {
     if (tbodyTabla) {
         let filteredEntidades = adminTemporaryEntidades;
         if (searchTerm) {
-            filteredEntidades = filteredEntidades.filter(e => 
-                (e.rut && e.rut.toLowerCase().includes(searchTerm)) ||
-                (e.nombre && e.nombre.toLowerCase().includes(searchTerm)) ||
-                (e.comuna && e.comuna.toLowerCase().includes(searchTerm)) ||
-                (e.programa && e.programa.toLowerCase().includes(searchTerm)) ||
-                (e.convenio && e.convenio.toLowerCase().includes(searchTerm))
-            );
+            filteredEntidades = filteredEntidades.filter(e => {
+                const rut = e.rut || e.RUT || '';
+                const nombre = e.nombre || e.Nombre || '';
+                const comuna = e.comuna || e.Comuna || '';
+                const programa = e.programa || e.Programa || '';
+                const convenio = e.convenio || e.Convenio || '';
+                return (
+                    rut.toString().toLowerCase().includes(searchTerm) ||
+                    nombre.toString().toLowerCase().includes(searchTerm) ||
+                    comuna.toString().toLowerCase().includes(searchTerm) ||
+                    programa.toString().toLowerCase().includes(searchTerm) ||
+                    convenio.toString().toLowerCase().includes(searchTerm)
+                );
+            });
         }
 
         let sortedEntidades = [...filteredEntidades];
         if (entidadesSortCol > -1) {
-            const cols = ['rut', 'nombre', 'comuna', 'programa', 'convenio', 'fecha'];
+            const colsLower = ['rut', 'nombre', 'comuna', 'programa', 'convenio', 'fecha'];
+            const colsUpper = ['RUT', 'Nombre', 'Comuna', 'Programa', 'Convenio', 'Fecha'];
             sortedEntidades.sort((a, b) => {
-                let vA = (a[cols[entidadesSortCol]] || '').toString().toLowerCase();
-                let vB = (b[cols[entidadesSortCol]] || '').toString().toLowerCase();
+                let vA = (a[colsLower[entidadesSortCol]] || a[colsUpper[entidadesSortCol]] || '').toString().toLowerCase();
+                let vB = (b[colsLower[entidadesSortCol]] || b[colsUpper[entidadesSortCol]] || '').toString().toLowerCase();
                 return vA < vB ? (entidadesSortAsc ? -1 : 1) : vA > vB ? (entidadesSortAsc ? 1 : -1) : 0;
             });
         }
@@ -2212,17 +2220,26 @@ function renderEntidadesAgregadas() {
         if (sortedEntidades.length === 0) {
             tbodyTabla.innerHTML = '<tr><td colspan="7" class="text-center">No se encontraron entidades con esa búsqueda.</td></tr>';
         } else {
-            tbodyTabla.innerHTML = sortedEntidades.map((e) => `
+            tbodyTabla.innerHTML = sortedEntidades.map((e) => {
+                const rut = e.rut || e.RUT || '';
+                const nombre = e.nombre || e.Nombre || '';
+                const comuna = e.comuna || e.Comuna || '';
+                const programa = e.programa || e.Programa || '';
+                const convenio = e.convenio || e.Convenio || '';
+                const fecha = e.fecha || e.Fecha || '';
+                const idEntidad = e.idEntidad || e.idEntidad || '';
+                return `
                 <tr>
-                    <td>${e.rut}</td><td>${e.nombre}</td><td>${e.comuna}</td>
-                    <td class="text-center"><strong>${e.programa}</strong></td>
-                    <td>${e.convenio}</td><td class="text-center">${e.fecha}</td>
+                    <td>${rut}</td><td>${nombre}</td><td>${comuna}</td>
+                    <td class="text-center"><strong>${programa}</strong></td>
+                    <td>${convenio}</td><td class="text-center">${fecha}</td>
                     <td class="text-center">
-                        <button class="btn btn-primary" style="padding:2px 8px; border-radius:3px; font-size:0.75rem; margin-right:4px;" onclick="editEntidad('${e.idEntidad}')" title="Editar Entidad">Editar</button>
-                        <button class="btn btn-danger" style="padding:2px 8px; border-radius:3px; font-size:0.75rem;" onclick="removeEntidad('${e.idEntidad}')" title="Eliminar Entidad">X</button>
+                        <button class="btn btn-primary" style="padding:2px 8px; border-radius:3px; font-size:0.75rem; margin-right:4px;" onclick="editEntidad('${idEntidad}')" title="Editar Entidad">Editar</button>
+                        <button class="btn btn-danger" style="padding:2px 8px; border-radius:3px; font-size:0.75rem;" onclick="removeEntidad('${idEntidad}')" title="Eliminar Entidad">X</button>
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         setupEntidadesHeaders();
