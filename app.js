@@ -736,7 +736,34 @@ function initSaveStatusMonitor() {
 function parseAsignacionEtapas(etapas) {
     let parsedEtapas = etapas;
     if (typeof parsedEtapas === 'string') {
-        parsedEtapas = parsedEtapas.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+        // Detectar y corregir valores corruptos como "2006", "2003", etc. (probablemente concatenación accidental con año)
+        // Las etapas válidas son 1-6, cualquier valor > 99 probablemente sea corrupto
+        parsedEtapas = parsedEtapas.split(',')
+            .map(n => {
+                const num = parseInt(n.trim(), 10);
+                // Si el número es > 100, probablemente sea "200X" (concatenación con año)
+                // Extraer el último dígito o los dos últimos dígitos relevantes
+                if (num > 100) {
+                    // Intentar extraer la etapa (1-6) del número corrupto
+                    const lastDigit = num % 10;
+                    const secondLastDigit = Math.floor((num % 100) / 10);
+                    // Si el último dígito es válido (1-6), usarlo
+                    if (lastDigit >= 1 && lastDigit <= 6) {
+                        console.warn(`⚠️ Etapa corrupta detectada: ${num} → corregida a ${lastDigit}`);
+                        return lastDigit;
+                    }
+                    // Si el segundo-último dígito es válido (1-6), usarlo
+                    if (secondLastDigit >= 1 && secondLastDigit <= 6) {
+                        console.warn(`⚠️ Etapa corrupta detectada: ${num} → corregida a ${secondLastDigit}`);
+                        return secondLastDigit;
+                    }
+                    // Si ninguno es válido, descartar
+                    console.warn(`⚠️ Etapa corrupta descartada: ${num}`);
+                    return NaN;
+                }
+                return num;
+            })
+            .filter(n => !isNaN(n) && n >= 1 && n <= 6);  // Solo valores válidos (1-6)
     } else if (!Array.isArray(parsedEtapas)) {
         parsedEtapas = [1];
     }

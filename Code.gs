@@ -238,6 +238,10 @@ function doPost(e) {
           if (h === 'itemId' && val && typeof val === 'string') {
             return "'" + val;  // Apóstrofe fuerza formato texto en Google Sheets
           }
+          // Forzar etapas como TEXTO para evitar que Google Sheets la interprete como número
+          if (h === 'etapas' && val && typeof val === 'string') {
+            return "'" + val;  // Apóstrofe fuerza formato texto en Google Sheets
+          }
           return val;
         }));
         sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
@@ -272,6 +276,10 @@ function doPost(e) {
             const val = obj[h] !== undefined ? obj[h] : "";
             // Forzar itemId como TEXTO
             if (h === 'itemId' && val && typeof val === 'string') {
+              return "'" + val;
+            }
+            // Forzar etapas como TEXTO para evitar que Google Sheets la interprete como número
+            if (h === 'etapas' && val && typeof val === 'string') {
               return "'" + val;
             }
             return val;
