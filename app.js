@@ -1,7 +1,7 @@
 /* ================= CONFIGURACIÓN DE ENTORNO WEB (GITHUB + GOOGLE SCRIPTS) ================= */
 // Las URLs sensibles y secrets se cargan desde config.js (no versionado)
 const CLOUD_MODE_ENABLED = CONFIG?.CLOUD_MODE_ENABLED ?? true;
-const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbxCKdEApmUiB9_uiHBaZb5uki9DkZbSZfcc0QITdZ1o24YneLeO724ys0LDx49i8OBGwA/exec";
+const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbxt8ro_g6OEO-SuY2M9Q_FQ-ZcKnGBn6_sGI_bgK4-gLONF8gMxwlvvFwVD9ZBVvbIWFg/exec";
 
 // Sistema de rate limiting para login
 let loginAttempts = {};
@@ -4300,13 +4300,8 @@ function processAsignacionStaging(isPartialSave) {
     });
 
     const etapas = [];
-    document.querySelectorAll('.asig-etapa-chk:checked').forEach(c => {
-        const val = parseInt(c.value, 10);
-        console.log(`📋 Checkbox etapa - value="${c.value}" → parseInt=${val}`);
-        etapas.push(val);
-    });
+    document.querySelectorAll('.asig-etapa-chk:checked').forEach(c => etapas.push(parseInt(c.value, 10)));
     etapas.sort((a, b) => a - b);
-    console.log(`✅ Etapas finales seleccionadas:`, etapas);
 
     let totalCoveragesList = [];
     for (const [provincia, programas] of Object.entries(adminTemporaryLogisticaMap)) {
@@ -4349,7 +4344,6 @@ function processAsignacionStaging(isPartialSave) {
             return;
         } else {
             currentScreenStaging = { ruts: selectedEvaluatorsRuts, names: selectedEvaluatorsNames, etapas, coberturas: combinedCoverages };
-            console.log(`📝 currentScreenStaging creado:`, { etapas: currentScreenStaging.etapas });
         }
     }
 
@@ -4389,17 +4383,11 @@ function executeCommitAsignacion() {
     const store = tx.objectStore('asignaciones');
 
     const writeOps = () => {
-        allToSave.forEach((p, idx) => {
-            console.log(`🔍 Guardando asignación ${idx}:`, {
-                etapasArray: p.etapas,
-                etapasType: typeof p.etapas,
-                isArray: Array.isArray(p.etapas)
-            });
+        allToSave.forEach(p => {
             p.ruts.forEach(rut => {
                 p.coberturas.forEach(c => {
                     // Convertir etapas a string para que Google Sheets no las guarde como objetos Java
                     const etapasStr = Array.isArray(p.etapas) ? p.etapas.join(',') : p.etapas;
-                    console.log(`💾 Guardando etapas como string: "${etapasStr}"`);
                     store.put({ idAsig: `${rut}_${c.programa}_${c.provincia.replace(/\s+/g, '')}_${c.entidadId || 'none'}`, rut, programa: c.programa, provincia: c.provincia, entidadId: c.entidadId, entidadNombre: c.entidadNombre, etapas: etapasStr });
                 });
             });
@@ -5669,13 +5657,8 @@ function saveAsignacionHistorica() {
     });
 
     const etapas = [];
-    document.querySelectorAll('.asig-etapa-chk:checked').forEach(c => {
-        const val = parseInt(c.value, 10);
-        console.log(`📋 Checkbox etapa - value="${c.value}" → parseInt=${val}`);
-        etapas.push(val);
-    });
+    document.querySelectorAll('.asig-etapa-chk:checked').forEach(c => etapas.push(parseInt(c.value, 10)));
     etapas.sort((a, b) => a - b);
-    console.log(`✅ Etapas finales seleccionadas:`, etapas);
 
     let totalCoveragesList = [];
     for (const [provincia, programas] of Object.entries(adminTemporaryLogisticaMap)) {
