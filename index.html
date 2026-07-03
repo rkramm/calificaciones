@@ -6,7 +6,13 @@
     <script>
         // Detectar si está en GitHub Pages o local
         const isGitHub = window.location.hostname.includes('github.io');
-        const basePath = isGitHub ? '/Calificaciones/' : './';
+        let basePath = './';
+        if (isGitHub) {
+            // Extraer el nombre del repositorio de la URL actual (case-insensitive)
+            const pathname = window.location.pathname;
+            const match = pathname.match(/\/([^/]+)\//);
+            basePath = match ? ('/' + match[1] + '/') : '/Calificaciones/';
+        }
         // Crear base tag dinámicamente
         const baseTag = document.createElement('base');
         baseTag.href = basePath;
