@@ -2005,6 +2005,21 @@ function setupEventListeners() {
         });
     }
 
+    // Detectar si el usuario es 'admin' y cambiar maxlength de contraseña dinámicamente
+    const usernameInput = document.getElementById('username');
+    if (usernameInput && passwordInput) {
+        addManagedListener(usernameInput, 'input', () => {
+            const username = usernameInput.value.trim().toLowerCase();
+            if (username === 'admin') {
+                // Admin puede usar contraseñas más largas (13+ caracteres)
+                passwordInput.maxLength = 20;
+            } else {
+                // Usuarios normales limitados a 8 caracteres
+                passwordInput.maxLength = 8;
+            }
+        });
+    }
+
     const btnCloseNotif = document.getElementById('btn-close-notifications');
     if (btnCloseNotif) {
         addManagedListener(btnCloseNotif, 'click', () => {
