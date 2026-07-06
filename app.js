@@ -3711,12 +3711,53 @@ function renderEvaluatorHeaderInfo() {
             btn.onclick = () => {
                 console.log('🔄 Cambiando a entidad:', entidadNombre);
 
-                // CRÍTICO: Sincronizar TODOS los scores visibles ANTES de cambiar de entidad
-                // Esto evita que valores sin sincronizar se pierdan o se asignen a la entidad incorrecta
-                calculateLiveScore();
-                console.log('✅ Scores de entidad actual sincronizados a allMemoryScores');
+                // CRÍTICO: Sincronizar SOLO valores con contenido (no eliminar vacíos)
+                // Itera sobre inputs visibles y actualiza allMemoryScores para la entidad actual
+                const inputs = document.querySelectorAll('.score-input');
+                inputs.forEach(input => {
+                    const val = parseInt(input.value, 10);
+                    const id = input.getAttribute('data-id');
 
-                // Ahora sí cambiar la entidad
+                    if (!isNaN(val) && val > 0) {
+                        // Solo sincronizar si tiene un valor válido
+                        const existingIdx = allMemoryScores.findIndex(r =>
+                            r.cobertura === currentCoverage &&
+                            r.itemId === id &&
+                            r.stage === currentStage &&
+                            r.entidad === window.currentSelectedEntity
+                        );
+
+                        if (existingIdx >= 0) {
+                            // Actualizar valor existente
+                            allMemoryScores[existingIdx].score = val;
+                            allMemoryScores[existingIdx].modificado = true;
+                        } else {
+                            // Crear nuevo registro
+                            const activeAsig = allAsignacionesMapped.find(a =>
+                                a.cobertura === currentCoverage && a.entidadNombre === window.currentSelectedEntity
+                            ) || {};
+                            const entidadName = activeAsig.entidadNombre || window.currentSelectedEntity || '';
+                            allMemoryScores.push({
+                                idTx: `pending_${currentUser.rut}_${currentCoverage.replace(/[\s-]+/g, '')}_${entidadName.replace(/[\s-]+/g, '')}_${currentStage}_${id}`,
+                                timestampId: Date.now().toString(),
+                                rutEvaluador: currentUser.rut,
+                                nombreEvaluador: currentUser.nombre,
+                                programa: activeAsig.programa || '',
+                                provincia: activeAsig.provincia || '',
+                                entidad: entidadName,
+                                cobertura: currentCoverage,
+                                stage: currentStage,
+                                itemId: id,
+                                score: val,
+                                hora: formatDateTime(new Date()),
+                                modificado: true
+                            });
+                        }
+                    }
+                });
+                console.log('✅ Scores sincronizados (solo valores válidos)');
+
+                // Ahora cambiar la entidad
                 window.currentSelectedEntity = entidadNombre;
 
                 // Actualizar destaque visual del botón
@@ -3729,11 +3770,6 @@ function renderEvaluatorHeaderInfo() {
 
                 // Actualizar detalles de la entidad (nombre, RUT, proyectos)
                 updateEntityDetails(entidadNombre);
-
-                // IMPORTANTE: Limpiar dbScores ANTES de cargar la nueva entidad
-                // Esto evita que valores antiguos se mezclen con los nuevos
-                dbScores = {};
-                console.log('✅ dbScores limpiado');
 
                 // Cargar y renderizar los scores de la nueva entidad
                 loadScoresFromActiveContext();
