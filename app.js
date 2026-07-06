@@ -3711,7 +3711,19 @@ function renderEvaluatorHeaderInfo() {
             btn.onclick = () => {
                 window.currentSelectedEntity = entidadNombre;
                 console.log('🔄 Cambiando a entidad:', entidadNombre);
-                // Solo actualizar dbScores y renderizar tabla (sin recargar todo)
+
+                // Actualizar destaque visual del botón
+                document.querySelectorAll('.tab-button').forEach(b => {
+                    b.classList.remove('active');
+                    if (b.textContent === entidadNombre) {
+                        b.classList.add('active');
+                    }
+                });
+
+                // Actualizar detalles de la entidad (nombre, RUT, proyectos)
+                updateEntityDetails(entidadNombre);
+
+                // Cargar y renderizar los scores de la nueva entidad
                 loadScoresFromActiveContext();
                 renderEvaluatorView();
             };
@@ -3838,6 +3850,69 @@ function renderEvaluatorHeaderInfo() {
 /**
  * Renderiza las etapas a calificar para el evaluador
  */
+/**
+ * Actualiza solo los detalles de la entidad seleccionada (nombre, RUT, proyectos, etapas)
+ * SIN limpiar los datos ingresados en los inputs
+ */
+function updateEntityDetails(entidadNombre) {
+    const allCoverageAsigs = allAsignacionesMapped.filter(a => a.cobertura === currentCoverage);
+    const asignsForEntity = allCoverageAsigs.filter(a => a.entidadNombre === entidadNombre);
+
+    if (!asignsForEntity || asignsForEntity.length === 0) {
+        console.warn('No se encontró asignación para:', {entidad: entidadNombre});
+        return;
+    }
+
+    const selectedAsig = asignsForEntity[0];
+
+    // Actualizar detalles de la entidad
+    const nameEl = document.getElementById('eval-entity-name');
+    const rutEl = document.getElementById('eval-entity-rut');
+    const convenioEl = document.getElementById('eval-entity-convenio');
+    const fechaEl = document.getElementById('eval-entity-fecha');
+    const programaEl = document.getElementById('eval-entity-programa');
+
+    if (nameEl) nameEl.textContent = entidadNombre || 'Sin Entidad';
+    if (programaEl) {
+        const programas = asignsForEntity.map(a => a.programa).join(', ');
+        programaEl.textContent = programas || '---';
+    }
+
+    // Buscar datos adicionales en IndexedDB EN SEGUNDO PLANO
+    if (rutEl || convenioEl || fechaEl) {
+        dbGetAll('entidades', (entidades) => {
+            const normalize = (str) => str.toString().trim().toLowerCase().replace(/\s+/g, ' ').replace(/\.+$/g, '').replace(/\s*ltda\.?\s*$/g, ' ltda').replace(/\s*spa\.?\s*$/g, ' spa');
+            const target = normalize(entidadNombre);
+
+            let entidad = entidades.find(e => {
+                const nombre = e.nombre ? normalize(e.nombre) : '';
+                return nombre === target || nombre.includes(target) || target.includes(nombre);
+            });
+            entidad = entidad || {};
+
+            const getField = (obj, possibleKeys) => {
+                for (const key of possibleKeys) {
+                    if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
+                        return obj[key];
+                    }
+                }
+                return '';
+            };
+
+            const convenio = getField(entidad, ['convenio', 'Convenio', 'CONVENIO', 'N° Convenio Marco Seremi', 'N°ConvenioMarcoSeremi', 'convenio_marco', 'n_convenio']);
+            const fecha = getField(entidad, ['fecha', 'Fecha', 'FECHA', 'Fecha Convenio Marco', 'FechaConvenioMarco', 'fecha_convenio']);
+
+            if (rutEl) rutEl.textContent = entidad.rut || '---';
+            if (convenioEl) convenioEl.textContent = convenio || '---';
+            if (fechaEl) fechaEl.textContent = fecha || '---';
+        });
+    }
+
+    // Renderizar tabla de proyectos y etapas
+    renderProjectsTableAllPrograms(asignsForEntity, entidadNombre);
+    renderStagesForEvaluator(asignsForEntity);
+}
+
 function renderStagesForEvaluator(asignaciones) {
     const container = document.getElementById('eval-stages-container');
     if (!asignaciones || (Array.isArray(asignaciones) && asignaciones.length === 0)) {
