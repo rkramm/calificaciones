@@ -5176,25 +5176,24 @@ function saveEvaluatorScores(callback, options = {}) {
             }
         }
 
-        if (!actualEntityToSave) {
-            console.error('❌ CRÍTICO: actualEntityToSave es undefined. No se guardará nada.');
-        }
-
-        // IMPORTANTE: Incluir SOLO registros que fueron modificados del usuario actual, cobertura actual Y entidad actual
-        // No filtrar por currentInputValues, ya que otros registros están en otras etapas fuera del DOM
+        // IMPORTANTE: Guardar TODOS los registros modificados del usuario actual en la cobertura actual
+        // SIN limitar por una sola entidad, ya que el usuario pudo haber calificado múltiples entidades
         const recordsToSave = allMemoryScores
             .filter(r => {
                 // Incluir si:
                 // 1. Es del usuario actual
                 // 2. Es de la cobertura actual
-                // 3. Es de la entidad actual (usando la determinada desde datos visibles, NO window.currentSelectedEntity)
-                // 4. Tiene un valor > 0 (ya guardado en allMemoryScores)
-                // 5. Fue modificado desde la última sincronización (OPTIMIZACIÓN)
+                // 3. Tiene un valor > 0 (ya guardado en allMemoryScores)
+                // 4. Fue modificado desde la última sincronización (OPTIMIZACIÓN)
+                // NOTA: NO filtramos por entidad para permitir guardar múltiples entidades
                 const passes = r.rutEvaluador === currentUser.rut &&
                                r.cobertura === currentCoverage &&
-                               r.entidad === actualEntityToSave &&
                                r.score > 0 &&
                                r.modificado === true;
+
+                if (passes) {
+                    console.log(`📌 Record a guardar: entidad=${r.entidad}, itemId=${r.itemId}, score=${r.score}`);
+                }
                 return passes;
             })
             .map(memScore => {
@@ -5242,12 +5241,6 @@ function saveEvaluatorScores(callback, options = {}) {
             });
 
         console.log(`📊 recordsToSave tiene ${recordsToSave.length} registros para guardar`);
-
-        // IMPORTANTE: Sincronizar window.currentSelectedEntity con la entidad que se está guardando
-        if (actualEntityToSave && actualEntityToSave !== window.currentSelectedEntity) {
-            console.log('🔄 Actualizando window.currentSelectedEntity a:', actualEntityToSave);
-            window.currentSelectedEntity = actualEntityToSave;
-        }
 
         // Guardar DIRECTAMENTE en Google Sheets - Usar currentCoverage como clave maestra
         // Primero descargar todos los scores actuales de Google Sheets
