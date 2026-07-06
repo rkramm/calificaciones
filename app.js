@@ -5269,16 +5269,12 @@ function saveEvaluatorScores(callback, options = {}) {
                     console.log(`📌 Record a guardar: entidad=${r.entidad}, itemId=${r.itemId}, score=${r.score}`);
                 }
                 return passes;
-            })
-            .map(memScore => {
-                // Actualizar score SOLO si está visible en el DOM actual
-                const currentVal = currentInputValues[memScore.itemId];
-                if (currentVal !== undefined && currentVal > 0) {
-                    memScore.score = currentVal;
-                }
-                // Si no está en el DOM actual, mantener el score anterior
-                return memScore;
             });
+            // NOTA: NO se re-sincroniza con currentInputValues aquí porque ese objeto está
+            // indexado SOLO por itemId (sin entidad), lo que sobrescribía el score de TODOS
+            // los registros con ese itemId sin importar la entidad. calculateLiveScore() ya
+            // mantiene allMemoryScores actualizado en tiempo real por cada input, así que
+            // memScore.score ya tiene el valor correcto para su propia entidad.
 
         console.log('ITEMS A GUARDAR (recordsToSave):');
         recordsToSave.forEach(r => console.log('  ', r.itemId, '= score:', r.score));
