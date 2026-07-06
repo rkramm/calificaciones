@@ -5148,18 +5148,34 @@ function saveEvaluatorScores(callback, options = {}) {
         // CRÍTICO: Determinar la entidad a guardar basándose EN LOS DATOS VISIBLES, no en window.currentSelectedEntity
         // Si hay inputs visibles, determinar su entidad analizando qué está en pantalla
         let actualEntityToSave = window.currentSelectedEntity;
+        console.log('DEBUG: window.currentSelectedEntity =', actualEntityToSave);
+
         if (visibleItemIds.length > 0) {
             // Hay inputs visibles. Buscar la entidad del primer input visible
             const firstVisibleItemId = visibleItemIds[0];
-            const recordsWithVisibleItem = allMemoryScores.filter(r =>
-                r.itemId === firstVisibleItemId &&
-                r.rutEvaluador === currentUser.rut &&
-                r.cobertura === currentCoverage
-            );
+            console.log('DEBUG: firstVisibleItemId =', firstVisibleItemId);
+            console.log('DEBUG: allMemoryScores.length =', allMemoryScores.length);
+
+            const recordsWithVisibleItem = allMemoryScores.filter(r => {
+                const match = r.itemId == firstVisibleItemId && // usar == para comparar número con string
+                    r.rutEvaluador === currentUser.rut &&
+                    r.cobertura === currentCoverage;
+                if (match) {
+                    console.log('DEBUG: Found matching record:', r.itemId, '==', firstVisibleItemId, ', entidad=', r.entidad);
+                }
+                return match;
+            });
+
             if (recordsWithVisibleItem.length > 0) {
                 actualEntityToSave = recordsWithVisibleItem[0].entidad;
-                console.log('🔍 Entidad determinada desde datos visibles:', actualEntityToSave);
+                console.log('✅ Entidad determinada desde datos visibles:', actualEntityToSave);
+            } else {
+                console.log('⚠️ No se encontraron records. Usando window.currentSelectedEntity:', actualEntityToSave);
             }
+        }
+
+        if (!actualEntityToSave) {
+            console.error('❌ CRÍTICO: actualEntityToSave es undefined. No se guardará nada.');
         }
 
         // IMPORTANTE: Incluir SOLO registros que fueron modificados del usuario actual, cobertura actual Y entidad actual
