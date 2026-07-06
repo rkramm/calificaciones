@@ -3709,8 +3709,15 @@ function renderEvaluatorHeaderInfo() {
             btn.style.fontSize = '0.8rem';
             btn.style.padding = '6px 10px';
             btn.onclick = () => {
-                window.currentSelectedEntity = entidadNombre;
                 console.log('🔄 Cambiando a entidad:', entidadNombre);
+
+                // CRÍTICO: Sincronizar TODOS los scores visibles ANTES de cambiar de entidad
+                // Esto evita que valores sin sincronizar se pierdan o se asignen a la entidad incorrecta
+                calculateLiveScore();
+                console.log('✅ Scores de entidad actual sincronizados a allMemoryScores');
+
+                // Ahora sí cambiar la entidad
+                window.currentSelectedEntity = entidadNombre;
 
                 // Actualizar destaque visual del botón
                 document.querySelectorAll('.tab-button').forEach(b => {
@@ -3722,6 +3729,11 @@ function renderEvaluatorHeaderInfo() {
 
                 // Actualizar detalles de la entidad (nombre, RUT, proyectos)
                 updateEntityDetails(entidadNombre);
+
+                // IMPORTANTE: Limpiar dbScores ANTES de cargar la nueva entidad
+                // Esto evita que valores antiguos se mezclen con los nuevos
+                dbScores = {};
+                console.log('✅ dbScores limpiado');
 
                 // Cargar y renderizar los scores de la nueva entidad
                 loadScoresFromActiveContext();
