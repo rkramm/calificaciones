@@ -4456,10 +4456,16 @@ function _renderMonitoringTableData(asignaciones, evaluadores, scores) {
 
         const evMap = {}; evaluadores.forEach(e => evMap[e.rut] = e.nombre);
         const scoresMap = {}; scores.forEach(s => {
-            // IMPORTANTE: Incluir entidad en la clave para diferenciar scores de múltiples entidades en la misma cobertura
-            const k = `${s.rutEvaluador}_${s.programa}_${s.provincia}_${s.entidad}_${s.stage}`;
-            if (!scoresMap[k]) scoresMap[k] = [];
-            scoresMap[k].push(s);
+            // Crear dos claves: una con entidad (nuevos scores) y una sin entidad (compatibilidad con antiguos)
+            const kWithEntity = `${s.rutEvaluador}_${s.programa}_${s.provincia}_${s.entidad || ''}_${s.stage}`;
+            const kWithoutEntity = `${s.rutEvaluador}_${s.programa}_${s.provincia}_${s.stage}`;
+
+            if (!scoresMap[kWithEntity]) scoresMap[kWithEntity] = [];
+            scoresMap[kWithEntity].push(s);
+
+            // También guardar con clave sin entidad para compatibilidad hacia atrás
+            if (!scoresMap[kWithoutEntity]) scoresMap[kWithoutEntity] = [];
+            scoresMap[kWithoutEntity].push(s);
         });
 
         monitoringData = [];
@@ -4472,7 +4478,9 @@ function _renderMonitoringTableData(asignaciones, evaluadores, scores) {
             const parsedEtapas = parseAsignacionEtapas(asig.etapas);
 
             parsedEtapas.forEach(stg => {
-                const currentScores = scoresMap[`${asig.rut}_${asig.programa}_${asig.provincia}_${asig.entidadNombre}_${stg}`] || [];
+                // Buscar primero con entidad (nuevos scores), luego sin entidad (compatibilidad)
+                const currentScores = scoresMap[`${asig.rut}_${asig.programa}_${asig.provincia}_${asig.entidadNombre}_${stg}`] ||
+                                    scoresMap[`${asig.rut}_${asig.programa}_${asig.provincia}_${stg}`] || [];
                 let sum = 0, count = 0, maxTs = 0, lastDateStr = "";
                 currentScores.forEach(s => { 
                     sum += (parseInt(s.score, 10) || 0); count++; 
