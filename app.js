@@ -5327,16 +5327,32 @@ function saveEvaluatorScores(callback, options = {}) {
                 return s.rutEvaluador === currentUser.rut && s.cobertura !== currentCoverage;
             });
 
+            // 3. IMPORTANTE: Mantener scores del MISMO usuario, MISMA cobertura, pero que NO fueron modificados en esta sesión
+            // Esto previene sobrescritura cuando el evaluador guarda en múltiples sesiones
+            const existingScoresInCobertura = (allGoogleScores || []).filter(s => {
+                if (s.rutEvaluador !== currentUser.rut || s.cobertura !== currentCoverage) {
+                    return false;
+                }
+                // Verificar si este score ya existe en recordsToSave (por combinación de entidad + stage + itemId)
+                const isBeingUpdated = recordsToSave.some(r =>
+                    r.entidad === s.entidad &&
+                    r.stage === parseInt(s.stage, 10) &&
+                    r.itemId === s.itemId
+                );
+                // Si NO está siendo actualizado, mantenerlo
+                return !isBeingUpdated;
+            });
+
             console.log('ANTES DE GUARDAR');
             console.log('Cobertura:', currentCoverage);
             console.log('allGoogleScores TOTAL:', allGoogleScores ? allGoogleScores.length : 0);
             const ds27InGoogle = allGoogleScores ? allGoogleScores.filter(s => s.programa === 'DS27').length : 0;
             console.log('DS27 en Google Sheets AHORA:', ds27InGoogle);
             console.log('recordsToSave cantidad:', recordsToSave.length);
-            console.log('otherCoverageScores cantidad:', otherCoverageScores.length);
+            console.log('existingScoresInCobertura cantidad (NO serán sobrescritos):', existingScoresInCobertura.length);
 
-            // 3. Combinar: otros usuarios + otras coberturas + nuevos scores (score > 0)
-            const finalScores = [...otherUsersScores, ...otherCoverageScores, ...recordsToSave];
+            // 4. Combinar: otros usuarios + otras coberturas + scores existentes no modificados + nuevos scores
+            const finalScores = [...otherUsersScores, ...otherCoverageScores, ...existingScoresInCobertura, ...recordsToSave];
             const ds27InFinal = finalScores.filter(s => s.programa === 'DS27').length;
             console.log('DS27 en finalScores QUE SE GUARDARA:', ds27InFinal);
             console.log('finalScores TOTAL:', finalScores.length);
