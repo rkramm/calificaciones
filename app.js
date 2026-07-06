@@ -3709,56 +3709,8 @@ function renderEvaluatorHeaderInfo() {
             btn.style.fontSize = '0.8rem';
             btn.style.padding = '6px 10px';
             btn.onclick = () => {
-                console.log('🔄 Cambiando a entidad:', entidadNombre);
-
-                // CRÍTICO: Sincronizar SOLO valores con contenido (no eliminar vacíos)
-                // Itera sobre inputs visibles y actualiza allMemoryScores para la entidad actual
-                const inputs = document.querySelectorAll('.score-input');
-                inputs.forEach(input => {
-                    const val = parseInt(input.value, 10);
-                    const id = input.getAttribute('data-id');
-
-                    if (!isNaN(val) && val > 0) {
-                        // Solo sincronizar si tiene un valor válido
-                        const existingIdx = allMemoryScores.findIndex(r =>
-                            r.cobertura === currentCoverage &&
-                            r.itemId === id &&
-                            r.stage === currentStage &&
-                            r.entidad === window.currentSelectedEntity
-                        );
-
-                        if (existingIdx >= 0) {
-                            // Actualizar valor existente
-                            allMemoryScores[existingIdx].score = val;
-                            allMemoryScores[existingIdx].modificado = true;
-                        } else {
-                            // Crear nuevo registro
-                            const activeAsig = allAsignacionesMapped.find(a =>
-                                a.cobertura === currentCoverage && a.entidadNombre === window.currentSelectedEntity
-                            ) || {};
-                            const entidadName = activeAsig.entidadNombre || window.currentSelectedEntity || '';
-                            allMemoryScores.push({
-                                idTx: `pending_${currentUser.rut}_${currentCoverage.replace(/[\s-]+/g, '')}_${entidadName.replace(/[\s-]+/g, '')}_${currentStage}_${id}`,
-                                timestampId: Date.now().toString(),
-                                rutEvaluador: currentUser.rut,
-                                nombreEvaluador: currentUser.nombre,
-                                programa: activeAsig.programa || '',
-                                provincia: activeAsig.provincia || '',
-                                entidad: entidadName,
-                                cobertura: currentCoverage,
-                                stage: currentStage,
-                                itemId: id,
-                                score: val,
-                                hora: formatDateTime(new Date()),
-                                modificado: true
-                            });
-                        }
-                    }
-                });
-                console.log('✅ Scores sincronizados (solo valores válidos)');
-
-                // Ahora cambiar la entidad
                 window.currentSelectedEntity = entidadNombre;
+                console.log('🔄 Cambiando a entidad:', entidadNombre);
 
                 // Actualizar destaque visual del botón
                 document.querySelectorAll('.tab-button').forEach(b => {
@@ -5526,11 +5478,16 @@ if (!document.getElementById('toast-styles')) {
 
 function loadScoresFromActiveContext() {
     dbScores = {};
-    const filteredScores = allMemoryScores.filter(r =>
-        r.cobertura === currentCoverage &&
-        r.stage === currentStage &&
-        r.entidad === window.currentSelectedEntity
-    );
+    // CRÍTICO: Normalizar entidad para comparación exacta (elimina espacios extras)
+    const normalizeEntity = (str) => (str || '').trim();
+    const currentEntity = normalizeEntity(window.currentSelectedEntity);
+
+    const filteredScores = allMemoryScores.filter(r => {
+        const rEntity = normalizeEntity(r.entidad);
+        return r.cobertura === currentCoverage &&
+               r.stage === currentStage &&
+               rEntity === currentEntity;
+    });
 
     console.log(`🔍 loadScoresFromActiveContext:`);
     console.log(`   - Cobertura actual: "${currentCoverage}"`);
@@ -5631,15 +5588,20 @@ function calculateLiveScore() {
     const inputs = document.querySelectorAll('.score-input');
     let totalStage = 0, countStage = 0;
 
+    // CRÍTICO: Normalizar entidad para comparación exacta
+    const normalizeEntity = (str) => (str || '').trim();
+    const currentEntity = normalizeEntity(window.currentSelectedEntity);
+
     inputs.forEach(input => {
         let val = parseInt(input.value, 10);
         const id = input.getAttribute('data-id');
-        const existingIdx = allMemoryScores.findIndex(r =>
-            r.cobertura === currentCoverage &&
-            r.itemId === id &&
-            parseInt(r.stage,10) === currentStage &&
-            r.entidad === window.currentSelectedEntity
-        );
+        const existingIdx = allMemoryScores.findIndex(r => {
+            const rEntity = normalizeEntity(r.entidad);
+            return r.cobertura === currentCoverage &&
+                   r.itemId === id &&
+                   parseInt(r.stage,10) === currentStage &&
+                   rEntity === currentEntity;
+        });
 
         // Si está vacío o es NaN, eliminar del registro (para que se borre en Google Sheets)
         if (isNaN(val)) {
