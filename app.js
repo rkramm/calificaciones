@@ -5241,6 +5241,12 @@ function saveEvaluatorScores(callback, options = {}) {
 
         console.log(`📊 recordsToSave tiene ${recordsToSave.length} registros para guardar`);
 
+        // IMPORTANTE: Sincronizar window.currentSelectedEntity con la entidad que se está guardando
+        if (actualEntityToSave && actualEntityToSave !== window.currentSelectedEntity) {
+            console.log('🔄 Actualizando window.currentSelectedEntity a:', actualEntityToSave);
+            window.currentSelectedEntity = actualEntityToSave;
+        }
+
         // Guardar DIRECTAMENTE en Google Sheets - Usar currentCoverage como clave maestra
         // Primero descargar todos los scores actuales de Google Sheets
         cloudGet('scores').then(allGoogleScores => {
