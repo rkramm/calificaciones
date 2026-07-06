@@ -5680,6 +5680,15 @@ function renderEvaluatorView() {
 
     document.querySelectorAll('.score-input').forEach(input => {
         addManagedListener(input, 'input', () => { hasUnsavedEvaluatorChanges = true; calculateLiveScore(); });
+        // Resaltar la fila completa mientras se está calificando ese ítem
+        addManagedListener(input, 'focus', () => {
+            const row = input.closest('tr');
+            if (row) row.classList.add('row-active');
+        });
+        addManagedListener(input, 'blur', () => {
+            const row = input.closest('tr');
+            if (row) row.classList.remove('row-active');
+        });
     });
 
     calculateLiveScore();

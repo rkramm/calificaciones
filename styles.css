@@ -219,6 +219,21 @@ input[type="number"] { -moz-appearance: textfield; }
     background: #FAFBFC;
 }
 
+/* Resaltar la fila completa al pasar el mouse o al calificar el ítem
+   (acotado a la tabla de calificación, no a otras tablas del sistema) */
+#evaluation-rows tr:hover {
+    background-color: #EEF4FB;
+}
+
+#evaluation-rows tr.row-active {
+    background-color: #E1EDFA;
+}
+
+#evaluation-rows tr.row-active .cell-score-input input {
+    background: #FFF;
+    border-color: var(--primary-blue);
+}
+
 .tabs-nav { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #E8EAED; padding-bottom: 3px; }
 .tab-button { background-color: #DCE1E9; border: none; padding: 8px 14px; font-weight: bold; color: var(--primary-dark); cursor: pointer; border-radius: 4px 4px 0 0; font-size: 0.85rem; }
 .tab-button.active { background-color: var(--primary-dark); color: var(--white); }
@@ -302,18 +317,21 @@ button { font-family: 'Segoe UI', sans-serif; }
 #eval-entity-tabs-container .tab-button.state-complete:not(.active) {
     background: #E4F5EC;
     border-color: #B9E3CD;
+    border-left: 4px solid #1F8A5F;
     color: #146245;
 }
 
 #eval-entity-tabs-container .tab-button.state-partial:not(.active) {
     background: #FBEEDD;
     border-color: #EED1A4;
+    border-left: 4px solid #C2790F;
     color: #8F5908;
 }
 
 #eval-entity-tabs-container .tab-button.state-pending:not(.active) {
     background: #FFF;
     border-color: #999;
+    border-left: 4px solid #B0B5C2;
     color: var(--primary-dark);
 }
 
