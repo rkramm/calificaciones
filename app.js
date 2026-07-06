@@ -5203,7 +5203,7 @@ function saveEvaluatorScores(callback, options = {}) {
                 // Si es nuevo ("pending_"), generar idTx definitivo pero mantener otros campos
                 const isNewRecord = !memScore.idTx || memScore.idTx.startsWith('pending_');
                 const newIdTx = isNewRecord ?
-                    `${currentUser.rut}_${memScore.cobertura.replace(/[\s-]+/g, '')}_${memScore.entidad.replace(/[\s-]+/g, '')}_${memScore.itemId}` :
+                    `${currentUser.rut}_${memScore.cobertura.replace(/[\s-]+/g, '')}_${memScore.entidad.replace(/[\s-]+/g, '')}_${memScore.stage}_${memScore.itemId}` :
                     memScore.idTx;
                 const newTimestampId = isNewRecord ? Date.now().toString() : memScore.timestampId;
 
