@@ -5135,13 +5135,32 @@ function saveEvaluatorScores(callback, options = {}) {
 
         // Obtener valores ACTUALES de los inputs (lo que realmente está visible en la pantalla)
         const currentInputValues = {};
+        const visibleItemIds = []; // NUEVO: rastrear TODOS los itemIds visibles, incluso con valor 0
         document.querySelectorAll('.score-input').forEach(input => {
             const id = input.getAttribute('data-id');
+            visibleItemIds.push(id); // Guardar el itemId aunque esté vacío
             const val = parseInt(input.value, 10);
             if (!isNaN(val) && val > 0) {
                 currentInputValues[id] = val;
             }
         });
+
+        // CRÍTICO: Determinar la entidad a guardar basándose EN LOS DATOS VISIBLES, no en window.currentSelectedEntity
+        // Si hay inputs visibles, determinar su entidad analizando qué está en pantalla
+        let actualEntityToSave = window.currentSelectedEntity;
+        if (visibleItemIds.length > 0) {
+            // Hay inputs visibles. Buscar la entidad del primer input visible
+            const firstVisibleItemId = visibleItemIds[0];
+            const recordsWithVisibleItem = allMemoryScores.filter(r =>
+                r.itemId === firstVisibleItemId &&
+                r.rutEvaluador === currentUser.rut &&
+                r.cobertura === currentCoverage
+            );
+            if (recordsWithVisibleItem.length > 0) {
+                actualEntityToSave = recordsWithVisibleItem[0].entidad;
+                console.log('🔍 Entidad determinada desde datos visibles:', actualEntityToSave);
+            }
+        }
 
         // IMPORTANTE: Incluir SOLO registros que fueron modificados del usuario actual, cobertura actual Y entidad actual
         // No filtrar por currentInputValues, ya que otros registros están en otras etapas fuera del DOM
@@ -5150,12 +5169,12 @@ function saveEvaluatorScores(callback, options = {}) {
                 // Incluir si:
                 // 1. Es del usuario actual
                 // 2. Es de la cobertura actual
-                // 3. Es de la entidad actual (CRÍTICO para evitar sobrescribir otras entidades)
+                // 3. Es de la entidad actual (usando la determinada desde datos visibles, NO window.currentSelectedEntity)
                 // 4. Tiene un valor > 0 (ya guardado en allMemoryScores)
                 // 5. Fue modificado desde la última sincronización (OPTIMIZACIÓN)
                 const passes = r.rutEvaluador === currentUser.rut &&
                                r.cobertura === currentCoverage &&
-                               r.entidad === window.currentSelectedEntity &&
+                               r.entidad === actualEntityToSave &&
                                r.score > 0 &&
                                r.modificado === true;
                 return passes;
