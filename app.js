@@ -5156,6 +5156,21 @@ function saveAdminItems() {
     tx.oncomplete = () => { alert("Textos guardados localmente. Recuerde Sincronizar a la Nube."); };
 }
 
+/**
+ * Intenta leer la tabla 'scores' desde Google Sheets con un reintento automático.
+ * Devuelve null SOLO si ambos intentos fallan, para que el llamador pueda abortar
+ * un guardado en modo 'replace' en lugar de tratarlo como "tabla vacía".
+ */
+async function _fetchScoresWithRetry() {
+    let result = await cloudGet('scores');
+    if (result === null) {
+        console.warn('⚠️ Primer intento de leer scores falló. Reintentando en 1.5s...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        result = await cloudGet('scores');
+    }
+    return result;
+}
+
 function saveEvaluatorScores(callback, options = {}) {
     const { silent = false } = options;
 
@@ -5314,7 +5329,20 @@ function saveEvaluatorScores(callback, options = {}) {
 
         // Guardar DIRECTAMENTE en Google Sheets - Usar currentCoverage como clave maestra
         // Primero descargar todos los scores actuales de Google Sheets
-        cloudGet('scores').then(allGoogleScores => {
+        _fetchScoresWithRetry().then(allGoogleScores => {
+            // 🛑 CRÍTICO: Si cloudGet falló incluso tras reintentar (retorna null por timeout/error de red/HTTP),
+            // NUNCA proceder con modo 'replace', ya que eso borraría TODA la tabla en Sheets
+            // y la reemplazaría solo con los registros de esta sesión, destruyendo el resto.
+            if (allGoogleScores === null) {
+                console.error('❌ CRÍTICO: No se pudo leer scores desde Google Sheets tras reintentar. Abortando guardado para evitar pérdida de datos.');
+                hideProgressBar();
+                if (!silent) {
+                    alert('❌ Error de conexión al guardar.\n\nNo se pudieron leer los datos actuales del servidor, por lo que el guardado fue CANCELADO para proteger la información existente.\n\nPor favor, verifique su conexión e intente guardar nuevamente.');
+                }
+                if (callback) callback(false);
+                return;
+            }
+
             // 1. Mantener scores de OTROS evaluadores
             const otherUsersScores = (allGoogleScores || []).filter(s => s.rutEvaluador !== currentUser.rut);
 
