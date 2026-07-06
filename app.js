@@ -3711,10 +3711,9 @@ function renderEvaluatorHeaderInfo() {
             btn.onclick = () => {
                 window.currentSelectedEntity = entidadNombre;
                 console.log('🔄 Cambiando a entidad:', entidadNombre);
-                // Cargar y mostrar los scores de la nueva entidad
+                // Solo actualizar dbScores y renderizar tabla (sin recargar todo)
                 loadScoresFromActiveContext();
                 renderEvaluatorView();
-                renderEvaluatorHeaderInfo();
             };
             tabsContainer.appendChild(btn);
         });
@@ -5529,14 +5528,16 @@ function calculateLiveScore() {
             const activeAsig = allAsignacionesMapped.find(a =>
                 a.cobertura === currentCoverage && a.entidadNombre === window.currentSelectedEntity
             ) || {};
+            const entidadName = activeAsig.entidadNombre || window.currentSelectedEntity || '';
             allMemoryScores.push({
-                idTx: `pending_${currentUser.rut}_${currentCoverage.replace(/[\s-]+/g, '')}_${id}`,
+                // CRÍTICO: Incluir entidad en el idTx para diferenciar scores de diferentes entidades
+                idTx: `pending_${currentUser.rut}_${currentCoverage.replace(/[\s-]+/g, '')}_${entidadName.replace(/[\s-]+/g, '')}_${id}`,
                 timestampId: Date.now().toString(),
                 rutEvaluador: currentUser.rut,
                 nombreEvaluador: currentUser.nombre,
                 programa: activeAsig.programa || '',
                 provincia: activeAsig.provincia || '',
-                entidad: activeAsig.entidadNombre || '',
+                entidad: entidadName,
                 cobertura: currentCoverage,
                 stage: currentStage,
                 itemId: id,
