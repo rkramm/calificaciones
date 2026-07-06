@@ -297,6 +297,59 @@ button { font-family: 'Segoe UI', sans-serif; }
     box-shadow: 0 2px 6px rgba(0, 107, 185, 0.3);
 }
 
+/* Estado de avance por entidad (solo cuando NO está activa, para no pelear
+   con el resaltado de selección de arriba) */
+#eval-entity-tabs-container .tab-button.state-complete:not(.active) {
+    background: #E4F5EC;
+    border-color: #B9E3CD;
+    color: #146245;
+}
+
+#eval-entity-tabs-container .tab-button.state-partial:not(.active) {
+    background: #FBEEDD;
+    border-color: #EED1A4;
+    color: #8F5908;
+}
+
+#eval-entity-tabs-container .tab-button.state-pending:not(.active) {
+    background: #FFF;
+    border-color: #999;
+    color: var(--primary-dark);
+}
+
+#eval-entity-tabs-container .entity-name {
+    flex-basis: 100%;
+}
+
+#eval-entity-tabs-container .entity-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 20px;
+    margin-top: 2px;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+#eval-entity-tabs-container .tab-button.state-complete .entity-badge {
+    background: #1F8A5F;
+    color: #FFF;
+}
+
+#eval-entity-tabs-container .tab-button.state-partial .entity-badge {
+    background: #C2790F;
+    color: #FFF;
+}
+
+#eval-entity-tabs-container .tab-button.active .entity-badge {
+    background: rgba(255, 255, 255, 0.28);
+    color: #FFF;
+}
+
 /* Tabs de Coberturas (DS27, DS49, DS10) */
 #evaluador-coverage-tabs .tab-button {
     background: #2C3E50;

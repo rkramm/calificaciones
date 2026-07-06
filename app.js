@@ -3643,6 +3643,77 @@ function renderCoverageTabs() {
 }
 
 /**
+ * Calcula el avance de calificación de una entidad en la cobertura actual:
+ * cuántos ítems (de todas sus etapas asignadas) ya tienen score > 0.
+ * Es de solo lectura: no modifica allMemoryScores ni dbScores.
+ * @param {string} entidadNombre
+ * @returns {{completed: number, total: number, state: 'complete'|'partial'|'pending'}}
+ */
+function getEntityCompletionStatus(entidadNombre) {
+    const normalize = (str) => (str || '').trim();
+    const targetEntity = normalize(entidadNombre);
+
+    const asigsForEntity = allAsignacionesMapped.filter(a =>
+        a.cobertura === currentCoverage && normalize(a.entidadNombre) === targetEntity
+    );
+    if (asigsForEntity.length === 0) {
+        return { completed: 0, total: 0, state: 'pending' };
+    }
+
+    // Unión de todas las etapas asignadas a esta entidad en esta cobertura
+    const stagesSet = new Set();
+    asigsForEntity.forEach(a => (a.etapas || []).forEach(e => stagesSet.add(parseInt(e, 10))));
+
+    const itemsToUse = (dbItems && dbItems.length > 0) ? dbItems : DEFAULT_ITEMS;
+
+    let total = 0, completed = 0;
+    stagesSet.forEach(stage => {
+        const stageItems = itemsToUse.filter(i => parseInt(i.stage, 10) === stage);
+        total += stageItems.length;
+        stageItems.forEach(item => {
+            const hasScore = allMemoryScores.some(r =>
+                r.cobertura === currentCoverage &&
+                normalize(r.entidad) === targetEntity &&
+                parseInt(r.stage, 10) === stage &&
+                r.itemId === item.id &&
+                r.score > 0
+            );
+            if (hasScore) completed++;
+        });
+    });
+
+    let state = 'pending';
+    if (total > 0 && completed === total) state = 'complete';
+    else if (completed > 0) state = 'partial';
+
+    return { completed, total, state };
+}
+
+/**
+ * Recalcula y actualiza SOLO el estado visual (color + badge) de las pestañas
+ * de entidad ya existentes en el DOM, sin recrearlas ni tocar sus listeners.
+ * Se llama cada vez que cambia un score (calculateLiveScore) para mantener
+ * el avance visible actualizado mientras el evaluador califica.
+ */
+function refreshEntityTabsBadges() {
+    const tabsContainer = document.getElementById('eval-entity-tabs-container');
+    if (!tabsContainer) return;
+
+    tabsContainer.querySelectorAll('.tab-button[data-entidad]').forEach(btn => {
+        const entidadNombre = btn.dataset.entidad;
+        const { completed, total, state } = getEntityCompletionStatus(entidadNombre);
+
+        btn.classList.remove('state-complete', 'state-partial', 'state-pending');
+        btn.classList.add(`state-${state}`);
+
+        const badge = btn.querySelector('.entity-badge');
+        if (badge) {
+            badge.textContent = state === 'complete' ? '✓' : `${completed}/${total}`;
+        }
+    });
+}
+
+/**
  * Renderiza las pestañas de entidades, detalles y proyectos asociados a la cobertura activa del evaluador.
  * Las ENTIDADES siempre se muestran (vienen de asignaciones)
  * Los PROYECTOS se cargan en segundo plano (son opcionales)
@@ -3703,19 +3774,34 @@ function renderEvaluatorHeaderInfo() {
 
         // Renderizar botones de entidades de la página actual
         pageEntities.forEach(entidadNombre => {
+            const { completed, total, state } = getEntityCompletionStatus(entidadNombre);
+
             const btn = document.createElement('button');
-            btn.className = `tab-button ${window.currentSelectedEntity === entidadNombre ? 'active' : ''}`;
-            btn.textContent = entidadNombre;
+            btn.className = `tab-button state-${state} ${window.currentSelectedEntity === entidadNombre ? 'active' : ''}`;
+            btn.dataset.entidad = entidadNombre;
             btn.style.fontSize = '0.8rem';
             btn.style.padding = '6px 10px';
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'entity-name';
+            nameSpan.textContent = entidadNombre;
+
+            const badgeSpan = document.createElement('span');
+            badgeSpan.className = 'entity-badge';
+            badgeSpan.textContent = state === 'complete' ? '✓' : `${completed}/${total}`;
+
+            btn.appendChild(nameSpan);
+            btn.appendChild(badgeSpan);
+
             btn.onclick = () => {
                 window.currentSelectedEntity = entidadNombre;
                 console.log('🔄 Cambiando a entidad:', entidadNombre);
 
-                // Actualizar destaque visual del botón
-                document.querySelectorAll('.tab-button').forEach(b => {
+                // Actualizar destaque visual del botón (usa data-entidad, no textContent,
+                // ya que el botón ahora incluye el badge de avance dentro de su texto)
+                document.querySelectorAll('.tab-button[data-entidad]').forEach(b => {
                     b.classList.remove('active');
-                    if (b.textContent === entidadNombre) {
+                    if (b.dataset.entidad === entidadNombre) {
                         b.classList.add('active');
                     }
                 });
@@ -5686,6 +5772,7 @@ function calculateLiveScore() {
     }
 
     updateEntityAverage();
+    refreshEntityTabsBadges();
 }
 
 function updateEntityAverage() {
