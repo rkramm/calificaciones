@@ -3710,8 +3710,10 @@ function renderEvaluatorHeaderInfo() {
             btn.style.padding = '6px 10px';
             btn.onclick = () => {
                 window.currentSelectedEntity = entidadNombre;
-                // NO descargar de Google Sheets al cambiar de entidad (causa pérdida de datos ingresados)
-                // Los datos se descargan solo al login inicial
+                console.log('🔄 Cambiando a entidad:', entidadNombre);
+                // Cargar y mostrar los scores de la nueva entidad
+                loadScoresFromActiveContext();
+                renderEvaluatorView();
                 renderEvaluatorHeaderInfo();
             };
             tabsContainer.appendChild(btn);
