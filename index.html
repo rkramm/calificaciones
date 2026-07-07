@@ -52,21 +52,21 @@
     <div id="login-container" class="login-screen-center">
         <form id="login-screen" class="login-card" onsubmit="event.preventDefault();">
             <div class="login-header text-center" style="padding-bottom: 4px;">
-                <div style="display: flex; justify-content: center; margin-bottom: 16px;">
-                    <img src="logo_serviu.JPG" alt="SERVIU10 Logo" style="height: 80px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(37, 48, 107, 0.18));">
+                <div class="login-logo-wrap" style="display: flex; justify-content: center; margin-bottom: 16px;">
+                    <img src="logo_serviu.JPG" alt="SERVIU10 Logo" class="login-logo" style="height: 80px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(37, 48, 107, 0.18));">
                 </div>
-                <h2 style="margin: 0 0 6px 0; font-size: 1.5rem; font-weight: 700; color: var(--primary-dark); letter-spacing: -0.5px;">Bienvenido</h2>
+                <h2 class="login-title" style="margin: 0 0 6px 0; font-size: 1.5rem; font-weight: 700; color: var(--primary-dark); letter-spacing: -0.5px;">Bienvenido(a)</h2>
                 <p style="color: var(--primary-dark); font-size: 0.9rem; margin: 0; font-weight: 600; line-height: 1.4;">Piloto sistema de calificación<br>entidades patrocinantes</p>
-                <div style="height: 1px; background: linear-gradient(90deg, transparent, #D0D0D0, transparent); margin: 12px 0;"></div>
+                <div class="login-divider" style="height: 1px; background: linear-gradient(90deg, transparent, #D0D0D0, transparent); margin: 12px 0;"></div>
             </div>
 
-            <div style="margin-top: 16px;">
+            <div class="login-fields" style="margin-top: 16px;">
                 <div class="form-group">
-                    <label for="username" style="display: block; font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 10px; text-transform: none; letter-spacing: normal;">Ingrese su RUT</label>
+                    <label for="username" class="login-label" style="display: block; font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 10px; text-transform: none; letter-spacing: normal;">Ingrese su RUT</label>
                     <input type="text" id="username" placeholder="Ej: 12345678-9" class="modern-input" maxlength="10" style="padding: 14px 16px; font-size: 1rem;">
                 </div>
                 <div class="form-group">
-                    <label for="password" style="display: block; font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 10px; text-transform: none; letter-spacing: normal;">Ingrese su contraseña</label>
+                    <label for="password" class="login-label" style="display: block; font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 10px; text-transform: none; letter-spacing: normal;">Ingrese su contraseña</label>
                     <input type="password" id="password" class="modern-input" placeholder="••••••••" maxlength="8" style="padding: 14px 16px; font-size: 1rem;">
                 </div>
             </div>
@@ -78,7 +78,7 @@
                 <span id="conn-text" style="font-size: 0.8rem; color: #25306B; font-weight: bold;">Conectado</span>
             </div>
 
-            <div style="margin-top: 16px; text-align: center; padding-top: 12px; border-top: 1px solid #D2D7E0;">
+            <div class="login-footer" style="margin-top: 16px; text-align: center; padding-top: 12px; border-top: 1px solid #D2D7E0;">
                 <p style="font-size: 0.75rem; color: #999; font-style: italic; margin: 0; line-height: 1.4;">
                     Creado por Área Asistencia Técnica<br>Serviu Región de los Lagos - 2026
                 </p>
@@ -91,7 +91,7 @@
             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 20px;">
                 <div style="order: 2; flex: 0 1 auto; text-align: center;">
                     <h1 id="app-title">Panel de Control</h1>
-                    <p style="margin: 6px 0 0 0; font-size: 1rem; font-weight: 600; color: rgba(255, 255, 255, 0.95);"><span>Bienvenido</span> <span id="user-profile"></span></p>
+                    <p style="margin: 6px 0 0 0; font-size: 1rem; font-weight: 600; color: rgba(255, 255, 255, 0.95);"><span>Bienvenido(a)</span> <span id="user-profile"></span></p>
                 </div>
 
                 <div style="order: 1; flex: 1 1 0; text-align: left; display: flex; flex-direction: column; gap: 2px;">

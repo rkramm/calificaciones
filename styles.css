@@ -47,6 +47,26 @@ html { scroll-behavior: smooth; }
 .btn-login-modern { width: 100%; padding: 14px; font-size: 1rem; border-radius: 8px; background-color: var(--primary-blue); color: var(--white); font-weight: 600; letter-spacing: 0.5px; margin-top: 10px; box-shadow: 0 4px 12px rgba(0, 107, 185, 0.3); transition: transform 0.2s, box-shadow 0.2s; border: none; cursor: pointer; }
 .btn-login-modern:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0, 107, 185, 0.4); background-color: #005691; }
 .login-status-indicator { margin-top: 25px; font-size: 0.8rem; color: #718096; display: flex; justify-content: center; align-items: center; gap: 8px; }
+
+/* Login compacto para viewports de poca altura (ej. laptops 1366x768 con
+   escalado de Windows al 125-150% + barra del navegador, donde la altura
+   CSS real disponible baja de ~700px a ~500-600px y el formulario se corta).
+   No afecta el look en pantallas normales/altas: solo aplica bajo el umbral. */
+@media (max-height: 700px) {
+    .login-screen-center { align-items: flex-start; padding: 12px 16px; overflow-y: auto; }
+    .login-card { padding: 16px 24px; }
+    .login-logo-wrap { margin-bottom: 8px !important; }
+    .login-logo { height: 48px !important; }
+    .login-title { margin: 0 0 4px 0 !important; font-size: 1.25rem !important; }
+    .login-divider { margin: 8px 0 !important; }
+    .login-fields { margin-top: 8px !important; }
+    .login-card .form-group { margin-bottom: 8px; }
+    .login-label { margin-bottom: 5px !important; }
+    .login-card .modern-input { padding: 9px 14px !important; }
+    .btn-login-modern { margin-top: 8px !important; padding: 10px !important; }
+    .login-status-indicator { margin-top: 8px !important; }
+    .login-footer { margin-top: 8px !important; padding-top: 8px !important; }
+}
 .status-dot { display: inline-block; width: 10px; height: 10px; background-color: #CBD5E0; border-radius: 50%; transition: background-color 0.4s ease; box-shadow: 0 0 0 2px rgba(255,255,255,0.8); }
 
 .container { width: 100%; max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; min-height: 100vh; overflow-y: auto; }
