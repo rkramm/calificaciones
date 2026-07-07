@@ -5438,6 +5438,13 @@ function saveEvaluatorScores(callback, options = {}) {
                 return s.rutEvaluador === currentUser.rut && s.cobertura !== currentCoverage;
             });
 
+            // Normalización compartida para comparar claves entre allMemoryScores (JS) y
+            // allGoogleScores (recién descargado de Sheets vía getDisplayValues, todo string).
+            // Sin esto, un espacio extra en "entidad" o un stage "1" (string) vs 1 (number)
+            // hacía fallar el matching y las eliminaciones no se propagaban a Sheets.
+            const normalizeKey = (entidad, stage, itemId) =>
+                `${(entidad || '').toString().trim()}|${parseInt(stage, 10)}|${(itemId || '').toString().trim()}`;
+
             // 3a. Ítems que el evaluador borró explícitamente en esta sesión (tombstones:
             // score=0, modificado=true en allMemoryScores). Estos NO deben preservarse:
             // deben desaparecer de Google Sheets, no quedar con su valor anterior.
@@ -5449,7 +5456,7 @@ function saveEvaluatorScores(callback, options = {}) {
                         r.score === 0 &&
                         r.modificado === true
                     )
-                    .map(r => `${r.entidad}|${r.stage}|${r.itemId}`)
+                    .map(r => normalizeKey(r.entidad, r.stage, r.itemId))
             );
             if (deletedKeys.size > 0) {
                 console.log('🗑️ Ítems borrados explícitamente esta sesión (se eliminarán de Sheets):', Array.from(deletedKeys));
@@ -5462,16 +5469,12 @@ function saveEvaluatorScores(callback, options = {}) {
                 if (s.rutEvaluador !== currentUser.rut || s.cobertura !== currentCoverage) {
                     return false;
                 }
-                const key = `${s.entidad}|${parseInt(s.stage, 10)}|${s.itemId}`;
+                const key = normalizeKey(s.entidad, s.stage, s.itemId);
                 if (deletedKeys.has(key)) {
                     return false; // Fue borrado explícitamente: no preservar
                 }
-                // Verificar si este score ya existe en recordsToSave (por combinación de entidad + stage + itemId)
-                const isBeingUpdated = recordsToSave.some(r =>
-                    r.entidad === s.entidad &&
-                    r.stage === parseInt(s.stage, 10) &&
-                    r.itemId === s.itemId
-                );
+                // Verificar si este score ya existe en recordsToSave (misma clave normalizada)
+                const isBeingUpdated = recordsToSave.some(r => normalizeKey(r.entidad, r.stage, r.itemId) === key);
                 // Si NO está siendo actualizado, mantenerlo
                 return !isBeingUpdated;
             });
