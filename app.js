@@ -1879,8 +1879,9 @@ function downloadHistoricosFromCloud() {
 /* =============================================================================== */
 
 function getStatusInfo(score) {
+    // Malo: 0-49, Aceptable: 50-79, Bueno: 80-100
     if (score >= 80) return { text: "BUENO", bg: "var(--color-bueno)", color: "#000" };
-    if (score >= 51) return { text: "ACEPTABLE", bg: "var(--color-aceptable)", color: "#000" };
+    if (score >= 50) return { text: "ACEPTABLE", bg: "var(--color-aceptable)", color: "#000" };
     return { text: "MALO", bg: "var(--color-malo)", color: "#FFF" };
 }
 
@@ -5671,7 +5672,7 @@ function renderEvaluatorView() {
                 <td class="cell-index bold-text" style="padding: 1px 12px !important; margin: 0 !important; line-height: 1 !important; height: 30px !important; font-size: 0.95rem !important;">${item.id}</td>
                 <td class="cell-desc" style="padding: 1px 12px !important; margin: 0 !important; line-height: 1 !important; height: 30px !important; font-size: 0.9rem !important;">${item.text}</td>
                 <td colspan="3" class="cell-score-input" style="padding: 1px 12px !important; margin: 0 !important; line-height: 1 !important; height: 30px !important;">
-                    <input type="number" class="score-input" data-id="${item.id}" min="0" max="100" value="${score}" ${deadlineExpired ? 'disabled' : ''} placeholder="0" inputmode="numeric" style="height: 28px !important; padding: 2px !important; font-size: 0.9rem !important;">
+                    <input type="number" class="score-input" data-id="${item.id}" min="0" max="100" step="1" value="${score}" ${deadlineExpired ? 'disabled' : ''} placeholder="0" inputmode="numeric" style="height: 28px !important; padding: 2px !important; font-size: 0.9rem !important;">
                 </td>
             </tr>
         `;
@@ -5713,6 +5714,14 @@ function calculateLiveScore() {
 
     inputs.forEach(input => {
         let val = parseInt(input.value, 10);
+
+        // Solo se admiten números enteros (0-100): si se escribió un decimal
+        // (ej. "1.2" o "99.7"), sincronizar el campo visible con el entero
+        // truncado para que lo mostrado coincida siempre con lo guardado.
+        if (!isNaN(val) && input.value !== String(val)) {
+            input.value = val;
+        }
+
         const id = input.getAttribute('data-id');
         const existingIdx = allMemoryScores.findIndex(r => {
             const rEntity = normalizeEntity(r.entidad);
@@ -6106,7 +6115,7 @@ function renderHistoricoTable() {
                 <td class="cell-index bold-text">${item.id}</td>
                 <td class="cell-desc">${item.text}</td>
                 <td colspan="3" class="cell-score-input">
-                    <input type="number" class="historico-score-input" data-id="${item.id}" min="0" max="100" value="${score}" placeholder="0">
+                    <input type="number" class="historico-score-input" data-id="${item.id}" min="0" max="100" step="1" value="${score}" placeholder="0">
                 </td>
             </tr>
         `;
@@ -6126,6 +6135,13 @@ function calculateHistoricoLiveScore() {
 
     inputs.forEach(input => {
         let val = parseInt(input.value, 10);
+
+        // Solo se admiten números enteros (0-100): sincronizar el campo visible
+        // con el entero truncado si se escribió un decimal (ej. "1.2" -> "1").
+        if (!isNaN(val) && input.value !== String(val)) {
+            input.value = val;
+        }
+
         const id = input.getAttribute('data-id');
         const existingIdx = historicoMemory.findIndex(r => r.stage === historicoStage && r.itemId === id);
 
@@ -6584,7 +6600,7 @@ function continuarExportPDF() {
                 let cellColor = "#FFF";
                 if (val !== "-") {
                     if (val >= 80) cellColor = "#D4EDDA"; // Verde BUENO
-                    else if (val >= 51) cellColor = "#FFF3CD"; // Amarillo ACEPTABLE
+                    else if (val >= 50) cellColor = "#FFF3CD"; // Amarillo ACEPTABLE
                     else cellColor = "#F8D7DA"; // Rojo MALO
                 }
 
