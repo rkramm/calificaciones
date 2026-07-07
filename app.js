@@ -5438,11 +5438,33 @@ function saveEvaluatorScores(callback, options = {}) {
                 return s.rutEvaluador === currentUser.rut && s.cobertura !== currentCoverage;
             });
 
-            // 3. IMPORTANTE: Mantener scores del MISMO usuario, MISMA cobertura, pero que NO fueron modificados en esta sesión
-            // Esto previene sobrescritura cuando el evaluador guarda en múltiples sesiones
+            // 3a. Ítems que el evaluador borró explícitamente en esta sesión (tombstones:
+            // score=0, modificado=true en allMemoryScores). Estos NO deben preservarse:
+            // deben desaparecer de Google Sheets, no quedar con su valor anterior.
+            const deletedKeys = new Set(
+                allMemoryScores
+                    .filter(r =>
+                        r.rutEvaluador === currentUser.rut &&
+                        r.cobertura === currentCoverage &&
+                        r.score === 0 &&
+                        r.modificado === true
+                    )
+                    .map(r => `${r.entidad}|${r.stage}|${r.itemId}`)
+            );
+            if (deletedKeys.size > 0) {
+                console.log('🗑️ Ítems borrados explícitamente esta sesión (se eliminarán de Sheets):', Array.from(deletedKeys));
+            }
+
+            // 3b. Mantener scores del MISMO usuario, MISMA cobertura, que NO fueron modificados
+            // en esta sesión NI borrados explícitamente. Esto previene sobrescritura cuando el
+            // evaluador guarda en múltiples sesiones, sin bloquear las eliminaciones intencionales.
             const existingScoresInCobertura = (allGoogleScores || []).filter(s => {
                 if (s.rutEvaluador !== currentUser.rut || s.cobertura !== currentCoverage) {
                     return false;
+                }
+                const key = `${s.entidad}|${parseInt(s.stage, 10)}|${s.itemId}`;
+                if (deletedKeys.has(key)) {
+                    return false; // Fue borrado explícitamente: no preservar
                 }
                 // Verificar si este score ya existe en recordsToSave (por combinación de entidad + stage + itemId)
                 const isBeingUpdated = recordsToSave.some(r =>
@@ -5487,6 +5509,15 @@ function saveEvaluatorScores(callback, options = {}) {
                             allMemoryScores[idx].modificado = false;
                         }
                     });
+
+                    // Limpiar tombstones (score=0, modificado=true) ya propagados a Sheets:
+                    // su eliminación ya se aplicó, no hace falta seguir rastreándolos.
+                    allMemoryScores = allMemoryScores.filter(r =>
+                        !(r.rutEvaluador === currentUser.rut &&
+                          r.cobertura === currentCoverage &&
+                          r.score === 0 &&
+                          r.modificado === true)
+                    );
                 }
 
                 if (!silent) {
@@ -5731,17 +5762,18 @@ function calculateLiveScore() {
                    rEntity === currentEntity;
         });
 
-        // Si está vacío o es NaN, eliminar del registro (para que se borre en Google Sheets)
-        if (isNaN(val)) {
+        // Si está vacío/NaN o es 0, el usuario borró la calificación.
+        // IMPORTANTE: no eliminar el registro de allMemoryScores (splice), sino marcarlo
+        // como "score: 0, modificado: true" (tombstone). Si lo eliminamos del array,
+        // saveEvaluatorScores() pierde la señal de que este ítem fue borrado a propósito
+        // y la protección contra sobrescrituras entre sesiones termina preservando el
+        // valor viejo en Google Sheets en vez de borrarlo.
+        if (isNaN(val) || val === 0) {
             delete dbScores[id];
-            if (existingIdx >= 0) allMemoryScores.splice(existingIdx, 1);
-            return;
-        }
-
-        // Si es 0, también eliminar (usuario lo borró)
-        if (val === 0) {
-            delete dbScores[id];
-            if (existingIdx >= 0) allMemoryScores.splice(existingIdx, 1);
+            if (existingIdx >= 0) {
+                allMemoryScores[existingIdx].score = 0;
+                allMemoryScores[existingIdx].modificado = true;
+            }
             return;
         }
 
