@@ -4079,9 +4079,11 @@ function renderStagesForEvaluator(asignaciones) {
     });
 
     // Agregar promedio entidad dentro del contenedor
+    // OCULTO a pedido: se mantiene en el DOM (display:none) para que
+    // updateEntityAverage() siga funcionando sin errores, solo no se muestra.
     const avgWrapper = document.createElement('div');
     avgWrapper.style.cssText = `
-        display: flex;
+        display: none;
         align-items: center;
         gap: 6px;
         margin-left: auto;
