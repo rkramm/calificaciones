@@ -6717,20 +6717,56 @@ function continuarExportPDF() {
     html2pdf()
         .set(opt)
         .from(printContainer)
-        .toPdf()
-        .get('pdf')
-        .save();
+        .save()
+        .then(() => {
+            // Remover contenedor temporal
+            if (printContainer.parentNode) {
+                printContainer.parentNode.removeChild(printContainer);
+            }
 
-    // Ocultar progreso después de guardar
-    setTimeout(() => {
-        hideProgressBar();
-        notificationSystem.show('pdf-export', '✅ PDF exportado correctamente', 'success');
+            // Ocultar progreso
+            hideProgressBar();
+            notificationSystem.show('pdf-export', '✅ PDF exportado correctamente', 'success');
 
-        // Auto-ocultar mensaje después de 2 segundos
-        setTimeout(() => {
-            notificationSystem.remove('pdf-export');
-        }, 2000);
-    }, 500);
+            // Auto-ocultar mensaje después de 2 segundos
+            setTimeout(() => {
+                notificationSystem.remove('pdf-export');
+            }, 2000);
+        })
+        .catch(error => {
+            console.error('Error al generar PDF:', error);
+            hideProgressBar();
+            notificationSystem.show('pdf-export', '❌ Error al generar PDF', 'error');
+
+            if (printContainer.parentNode) {
+                printContainer.parentNode.removeChild(printContainer);
+            }
+        });
 
     document.body.removeChild(printContainer);
+}
+
+/* ================= CONSULTAR SESIONES ACTIVAS ================= */
+async function getActiveSessions() {
+    try {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+                action: 'getSessions',
+                csrfToken: csrfToken
+            })
+        });
+
+        if (!response.ok) {
+            console.error('Error obteniendo sesiones activas:', response.status);
+            return { success: false, sessions: [], count: 0 };
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error consultando sesiones activas:', error);
+        return { success: false, sessions: [], count: 0 };
+    }
 }
