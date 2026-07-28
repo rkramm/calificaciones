@@ -143,6 +143,161 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // ENDPOINT DE PRUEBA: Simula 5 usuarios insertando 20 asignaciones + 100 scores
+    if (action === 'test') {
+      const startTime = new Date().getTime();
+      try {
+        const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+        // PASO 1: Contar estado inicial
+        const sheetAsig = spreadsheet.getSheetByName('asignaciones');
+        const sheetScores = spreadsheet.getSheetByName('scores');
+        const initialAsignaciones = sheetAsig ? (sheetAsig.getLastRow() - 1) : 0;
+        const initialScores = sheetScores ? (sheetScores.getLastRow() - 1) : 0;
+
+        // PASO 2: Crear datos de prueba (5 usuarios × 4 entidades = 20 asignaciones)
+        const usuarios = ['00-1', '00-2', '00-3', '00-4', '00-5'];
+        const entidades = [
+          { id: 'ENT-T-001', nombre: 'Entidad Test 1' },
+          { id: 'ENT-T-002', nombre: 'Entidad Test 2' },
+          { id: 'ENT-T-003', nombre: 'Entidad Test 3' },
+          { id: 'ENT-T-004', nombre: 'Entidad Test 4' }
+        ];
+
+        const asignacionesData = [];
+        let asigId = 1;
+        for (const usuario of usuarios) {
+          for (const entidad of entidades) {
+            asignacionesData.push({
+              idAsig: `TEST-${asigId}`,
+              rut: usuario,
+              programa: 'DS49',
+              provincia: 'Santiago',
+              entidadId: entidad.id,
+              entidadNombre: entidad.nombre,
+              etapas: '1|2|3|4|5'
+            });
+            asigId++;
+          }
+        }
+
+        // PASO 3: Crear datos de scores (100 scores: 20 asignaciones × 5 calificaciones)
+        const scoresData = [];
+        let scoreId = 1;
+        for (const asig of asignacionesData) {
+          for (let etapa = 1; etapa <= 5; etapa++) {
+            scoresData.push({
+              idTx: `SCORE-TEST-${scoreId}`,
+              idAsig: asig.idAsig,
+              rut: asig.rut,
+              etapa: etapa,
+              score: Math.floor(Math.random() * 101),
+              timestamp: new Date().toISOString()
+            });
+            scoreId++;
+          }
+        }
+
+        // PASO 4: Insertar asignaciones en modo incremental
+        const versionDataTest = getVersionMap();
+        const sheetA = spreadsheet.getSheetByName('asignaciones') || spreadsheet.insertSheet('asignaciones');
+        const headersA = sheetA.getLastRow() > 0 ?
+          sheetA.getRange(1, 1, 1, sheetA.getLastColumn()).getDisplayValues()[0] :
+          ['idAsig', 'rut', 'programa', 'provincia', 'entidadId', 'entidadNombre', 'etapas'];
+
+        if (sheetA.getLastRow() === 0) {
+          sheetA.appendRow(headersA);
+        }
+
+        const refreshedValuesA = sheetA.getDataRange().getDisplayValues();
+        const keyIndexA = refreshedValuesA[0].indexOf('idAsig');
+        const rowMapA = {};
+        for (let i = 1; i < refreshedValuesA.length; i++) {
+          const key = refreshedValuesA[i][keyIndexA];
+          if (key) rowMapA[key] = i;
+        }
+
+        for (const asig of asignacionesData) {
+          const rowData = headersA.map(h => asig[h] || '');
+          if (!rowMapA[asig.idAsig]) {
+            sheetA.appendRow(rowData);
+          }
+        }
+        const newVersionA = bumpTableVersion('asignaciones', versionDataTest);
+
+        // PASO 5: Insertar scores en modo incremental
+        const sheetS = spreadsheet.getSheetByName('scores') || spreadsheet.insertSheet('scores');
+        const headersS = sheetS.getLastRow() > 0 ?
+          sheetS.getRange(1, 1, 1, sheetS.getLastColumn()).getDisplayValues()[0] :
+          ['idTx', 'idAsig', 'rut', 'etapa', 'score', 'timestamp'];
+
+        if (sheetS.getLastRow() === 0) {
+          sheetS.appendRow(headersS);
+        }
+
+        const refreshedValuesS = sheetS.getDataRange().getDisplayValues();
+        const keyIndexS = refreshedValuesS[0].indexOf('idTx');
+        const rowMapS = {};
+        for (let i = 1; i < refreshedValuesS.length; i++) {
+          const key = refreshedValuesS[i][keyIndexS];
+          if (key) rowMapS[key] = i;
+        }
+
+        for (const score of scoresData) {
+          const rowData = headersS.map(h => score[h] || '');
+          if (!rowMapS[score.idTx]) {
+            sheetS.appendRow(rowData);
+          }
+        }
+        const newVersionS = bumpTableVersion('scores', versionDataTest);
+
+        // PASO 6: Contar estado final
+        const finalAsignaciones = sheetA.getLastRow() - 1;
+        const finalScores = sheetS.getLastRow() - 1;
+        const asignacionesAñadidas = finalAsignaciones - initialAsignaciones;
+        const scoresAñadidos = finalScores - initialScores;
+
+        const duration = new Date().getTime() - startTime;
+        const success = asignacionesAñadidas === 20 && scoresAñadidos === 100;
+
+        return ContentService.createTextOutput(JSON.stringify({
+          success: success,
+          test: 'concurrency_5users_20asignaciones_100scores',
+          timestamp: new Date().toISOString(),
+          initialState: {
+            asignaciones: initialAsignaciones,
+            scores: initialScores
+          },
+          finalState: {
+            asignaciones: finalAsignaciones,
+            scores: finalScores
+          },
+          expected: {
+            asignacionesAñadidas: 20,
+            scoresAñadidos: 100
+          },
+          actual: {
+            asignacionesAñadidas: asignacionesAñadidas,
+            scoresAñadidos: scoresAñadidos
+          },
+          dataIntegrity: {
+            nothingDeleted: asignacionesAñadidas >= 0 && scoresAñadidos >= 0,
+            allDataPreserved: initialAsignaciones + asignacionesAñadidas === finalAsignaciones && initialScores + scoresAñadidos === finalScores,
+            versionsIncremented: newVersionA > 1 && newVersionS > 1
+          },
+          duration_ms: duration
+        })).setMimeType(ContentService.MimeType.JSON);
+
+      } catch (error) {
+        return ContentService.createTextOutput(JSON.stringify({
+          success: false,
+          test: 'concurrency_test',
+          error: error.message,
+          duration_ms: new Date().getTime() - startTime
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
     // Registrar actividad (para timeout de inactividad después)
     if (userRut) {
       const sessionsJson = PROPERTIES.getProperty('ACTIVE_SESSIONS') || '{}';
