@@ -132,7 +132,7 @@ function doPost(e) {
           rut: rut,
           loginTime: session.loginTime,
           lastActivity: session.lastActivity,
-          nombre: rut  // El backend no guarda nombre, usar RUT como fallback
+          nombre: session.nombre || rut  // FIX: Usar session.nombre (que SÍ se guarda en línea 94)
         });
       }
 
@@ -204,11 +204,11 @@ function doPost(e) {
 
     // Definir headers: SIEMPRE obtener de la hoja existente, NUNCA de dataArray
     let headers = null;
-    const existingValues = sheet.getDataRange().getDisplayValues();
+    const lastRow = sheet.getLastRow();
 
-    if (existingValues.length > 0) {
-      // Si la hoja tiene datos, usa los headers existentes
-      headers = existingValues[0];
+    // FIX: Optimizar lectura de headers - solo leer fila 1, no TODO el sheet
+    if (lastRow > 0) {
+      headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
     } else if (tableName === 'historicos') {
       // Si la hoja está vacía, usar headers predeterminados para tabla históricos
       headers = ['PROVINCIA','PROGRAMA','ENTIDAD','CALIFICADOR','AÑO','1.1','1.2','1.3','1.4','1.5','1.6','1.7','1.8','1.9','2.1','2.2','2.3','2.4','2.5','2.6','2.7','2.8','2.9','3.1','3.2','3.3','3.4','3.5','3.6','3.7','4.1','4.2','4.3','4.4','4.5','4.6','4.7','4.8','4.9','4.10','5.1','5.2','5.3','5.4','5.5','5.6','5.7','6.1','6.2','6.3','6.4','6.5','6.6','6.7','6.8','6.9'];
@@ -314,6 +314,7 @@ function doPost(e) {
     }
 
     // Incrementar versión del servidor tras escritura exitosa (reutiliza versionData ya leído)
+    const versionData = getVersionMap();
     const newServerVersion = bumpTableVersion(tableName, versionData);
 
     return ContentService.createTextOutput(JSON.stringify({
