@@ -246,6 +246,7 @@ let adminTemporaryEntidades = [];
 let pendingAsignacionesStaging = [];
 let currentScreenStaging = null;
 let newlyCreatedAsignacionIds = []; // Rastrear solo nuevas asignaciones para sync seguro
+let pendingChangesForSync = null; // Cambios pendientes a sincronizar (después de preview)
 let countdownInterval = null;
 let savedDeadlineISO = "";
 
@@ -1307,71 +1308,262 @@ function syncSingleStoreToCloud(storeName, callback, options = {}) {
 }
 
 /**
- * SEGURIDAD: Sincroniza SOLO las asignaciones nuevas creadas en esta sesión de admin
- * Esto previene sobrescribir datos de otros evaluadores
+ * Sincroniza con PREVIEW: Compara local con servidor y muestra cambios
+ * Admin puede revisar y aprobar antes de sincronizar
  */
-function syncOnlyNewAsignaciones(callback) {
+function syncWithPreview(callback) {
     if (!CLOUD_MODE_ENABLED) {
         if (callback) callback(true);
         return;
     }
 
-    showProgressBar('Sincronizando nuevas asignaciones...');
+    showProgressBar('Descargando datos del servidor para comparar...');
 
-    // Obtener solo las asignaciones nuevas marcadas en esta sesión
-    const req = dbInstance.transaction(['asignaciones'], 'readonly').objectStore('asignaciones').getAll();
-    req.onsuccess = (e) => {
-        const allAsignaciones = e.target.result || [];
-        // Filtrar solo las que fueron creadas en esta sesión
-        const onlyNewOnes = allAsignaciones.filter(a => a._isNewThisSession === true);
+    // Paso 1: Obtener datos locales
+    const txLocal = dbInstance.transaction(['asignaciones'], 'readonly');
+    const reqLocal = txLocal.objectStore('asignaciones').getAll();
 
-        console.log(`📤 Sincronizando ${onlyNewOnes.length} asignaciones nuevas de ${allAsignaciones.length} totales`);
+    reqLocal.onsuccess = (e) => {
+        const localAsignaciones = e.target.result || [];
 
-        // Si no hay nuevas, no hacer nada
-        if (onlyNewOnes.length === 0) {
+        // Paso 2: Descargar del servidor
+        cloudGet('asignaciones').then(serverAsignaciones => {
+            serverAsignaciones = serverAsignaciones || [];
+
+            // Paso 3: Comparar y detectar cambios
+            const changes = compareAsignaciones(localAsignaciones, serverAsignaciones);
+
             hideProgressBar();
-            console.warn('⚠️ No hay asignaciones nuevas para sincronizar');
-            if (callback) callback(true);
-            return;
-        }
 
-        // Sincronizar solo las nuevas
-        cloudSave('asignaciones', onlyNewOnes, 'incremental', {}).then(res => {
-            hideProgressBar();
-            if (res && res.success) {
-                // Marcar como sincronizadas
-                const updateTx = dbInstance.transaction(['asignaciones'], 'readwrite');
-                onlyNewOnes.forEach(a => {
-                    updateTx.objectStore('asignaciones').put({ ...a, _isNewThisSession: false });
-                });
-                updateTx.oncomplete = () => {
-                    console.log('✅ Asignaciones nuevas sincronizadas correctamente');
-                    if (callback) callback(true);
-                };
-            } else if (res && res.versionConflict) {
-                handleVersionConflict('asignaciones', res).then(force => {
-                    if (force) {
-                        syncOnlyNewAsignaciones(callback);
-                    } else {
-                        if (callback) callback(false);
-                    }
-                });
-            } else {
-                alert(`Error al sincronizar: ${res ? res.error : 'Respuesta inválida'}`);
-                if (callback) callback(false);
+            // Paso 4: Mostrar preview si hay cambios
+            if (changes.nuevas.length === 0 && changes.modificadas.length === 0 && changes.borradas.length === 0) {
+                alert('No hay cambios para sincronizar.');
+                if (callback) callback(true);
+                return;
             }
+
+            // Guardar cambios para aprobar después
+            pendingChangesForSync = changes;
+
+            // Mostrar modal de preview
+            showChangesPreview(changes, callback);
         }).catch(err => {
-            console.error('Error de red al sincronizar:', err);
             hideProgressBar();
-            alert('Error de red. Verifique su conexión.');
+            console.error('Error al descargar del servidor:', err);
+            alert('Error al comparar con el servidor: ' + err.message);
             if (callback) callback(false);
         });
     };
-    req.onerror = () => {
+
+    reqLocal.onerror = () => {
         hideProgressBar();
         alert('Error al leer datos locales.');
         if (callback) callback(false);
     };
+}
+
+/**
+ * Compara asignaciones locales con servidor
+ * Retorna objeto con: nuevas, modificadas, borradas
+ */
+function compareAsignaciones(localData, serverData) {
+    const result = {
+        nuevas: [],      // Existen localmente pero no en servidor
+        modificadas: [], // Existen en ambos pero diferentes
+        borradas: []     // Marcadas como _isDeleted localmente
+    };
+
+    // Crear mapas para búsqueda rápida
+    const serverMap = {};
+    serverData.forEach(s => {
+        serverMap[s.idAsig] = s;
+    });
+
+    const localMap = {};
+    localData.forEach(l => {
+        localMap[l.idAsig] = l;
+    });
+
+    // Detectar nuevas y modificadas localmente
+    localData.forEach(local => {
+        if (local._isDeleted) {
+            // Ya marcada como borrada
+            result.borradas.push({
+                idAsig: local.idAsig,
+                rut: local.rut,
+                programa: local.programa,
+                provincia: local.provincia,
+                entidadNombre: local.entidadNombre
+            });
+        } else if (!serverMap[local.idAsig]) {
+            // Nueva (no existe en servidor)
+            result.nuevas.push({
+                accion: 'CREAR',
+                idAsig: local.idAsig,
+                rut: local.rut,
+                programa: local.programa,
+                provincia: local.provincia,
+                entidadId: local.entidadId,
+                entidadNombre: local.entidadNombre,
+                etapas: local.etapas
+            });
+        } else if (JSON.stringify(local) !== JSON.stringify(serverMap[local.idAsig])) {
+            // Modificada (existe pero es diferente)
+            result.modificadas.push({
+                accion: 'ACTUALIZAR',
+                idAsig: local.idAsig,
+                anterior: serverMap[local.idAsig],
+                nuevo: local
+            });
+        }
+    });
+
+    // Detectar borradas del servidor (existen en servidor pero no localmente, sin estar marcadas como _isDeleted)
+    serverData.forEach(server => {
+        if (!localMap[server.idAsig] && !localData.some(l => l.idAsig === server.idAsig && l._isDeleted)) {
+            // Existe en servidor pero no en local y no está marcada como borrada
+            // Esto significa que fue eliminada del lado local
+            result.borradas.push({
+                accion: 'ELIMINAR',
+                idAsig: server.idAsig,
+                rut: server.rut,
+                programa: server.programa,
+                provincia: server.provincia,
+                entidadNombre: server.entidadNombre
+            });
+        }
+    });
+
+    console.log('📊 Cambios detectados:', result);
+    return result;
+}
+
+/**
+ * Muestra modal con preview de cambios
+ */
+function showChangesPreview(changes, callback) {
+    const modal = document.getElementById('audit-modal');
+    document.getElementById('modal-title').textContent = '📋 PREVIEW DE CAMBIOS A SINCRONIZAR';
+    toggleElement('modal-table-container', false);
+    toggleElement('modal-overwrite-question', false);
+
+    let html = '<div style="max-height: 400px; overflow-y: auto; font-size: 0.9rem;">';
+
+    // Nuevas asignaciones (verde)
+    if (changes.nuevas.length > 0) {
+        html += '<div style="background: #E8F5E9; border-left: 4px solid #4CAF50; padding: 12px; margin-bottom: 12px;">';
+        html += `<h4 style="margin: 0 0 8px 0; color: #2E7D32;">🟢 NUEVAS (${changes.nuevas.length})</h4>`;
+        changes.nuevas.forEach(c => {
+            html += `<div style="padding: 6px 0; border-bottom: 1px solid #C8E6C9;">
+                <strong>${c.rut}</strong> → ${c.programa} (${c.provincia}) - ${c.entidadNombre}
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    // Modificadas (amarillo)
+    if (changes.modificadas.length > 0) {
+        html += '<div style="background: #FFF3E0; border-left: 4px solid #FF9800; padding: 12px; margin-bottom: 12px;">';
+        html += `<h4 style="margin: 0 0 8px 0; color: #E65100;">🟡 MODIFICADAS (${changes.modificadas.length})</h4>`;
+        changes.modificadas.forEach(c => {
+            html += `<div style="padding: 6px 0; border-bottom: 1px solid #FFE0B2;">
+                <strong>${c.idAsig}</strong><br>
+                <small style="color: #666;">Antes: ${JSON.stringify(c.anterior).substring(0, 80)}...</small><br>
+                <small style="color: #333;">Ahora: ${JSON.stringify(c.nuevo).substring(0, 80)}...</small>
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    // Borradas (rojo)
+    if (changes.borradas.length > 0) {
+        html += '<div style="background: #FFEBEE; border-left: 4px solid #F44336; padding: 12px; margin-bottom: 12px;">';
+        html += `<h4 style="margin: 0 0 8px 0; color: #C62828;">🔴 ELIMINADAS (${changes.borradas.length})</h4>`;
+        changes.borradas.forEach(c => {
+            html += `<div style="padding: 6px 0; border-bottom: 1px solid #FFCDD2;">
+                <strong>${c.rut}</strong> → ${c.programa} (${c.provincia}) - ${c.entidadNombre}
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    html += '</div>';
+
+    document.getElementById('modal-custom-html-body').innerHTML = html;
+
+    // Botones: Aprobar y Rechazar
+    toggleElement('modal-action-footer', true);
+    const footer = document.getElementById('modal-action-footer');
+    footer.innerHTML = `
+        <button class="btn" style="background-color: #6C757D;" onclick="rejectChanges()">❌ Rechazar</button>
+        <button class="btn btn-primary" onclick="approveChanges()">✅ Aprobar y Sincronizar</button>
+    `;
+
+    // Definir funciones de aprobación/rechazo
+    window.approveChanges = () => {
+        closeModal();
+        syncApprovedChanges(callback);
+    };
+
+    window.rejectChanges = () => {
+        closeModal();
+        pendingChangesForSync = null;
+        console.log('❌ Sincronización cancelada por usuario');
+        if (callback) callback(false);
+    };
+
+    toggleElement('audit-modal', true);
+}
+
+/**
+ * Sincroniza solo los cambios aprobados
+ */
+function syncApprovedChanges(callback) {
+    if (!pendingChangesForSync) {
+        alert('No hay cambios pendientes.');
+        if (callback) callback(false);
+        return;
+    }
+
+    showProgressBar('Sincronizando cambios aprobados...');
+    const changes = pendingChangesForSync;
+
+    // Reunir todo lo que se debe sincronizar
+    const toSync = [...changes.nuevas, ...changes.modificadas, ...changes.borradas];
+
+    cloudSave('asignaciones', toSync, 'incremental', {}).then(res => {
+        hideProgressBar();
+
+        if (res && res.success) {
+            console.log('✅ Cambios sincronizados correctamente');
+            alert(`✅ Sincronización completada:\n- ${changes.nuevas.length} nuevas\n- ${changes.modificadas.length} modificadas\n- ${changes.borradas.length} eliminadas`);
+            pendingChangesForSync = null;
+            if (callback) callback(true);
+        } else if (res && res.versionConflict) {
+            handleVersionConflict('asignaciones', res).then(force => {
+                if (force) {
+                    syncApprovedChanges(callback);
+                } else {
+                    if (callback) callback(false);
+                }
+            });
+        } else {
+            alert(`Error al sincronizar: ${res ? res.error : 'Error desconocido'}`);
+            if (callback) callback(false);
+        }
+    }).catch(err => {
+        hideProgressBar();
+        console.error('Error de red:', err);
+        alert('Error de red: ' + err.message);
+        if (callback) callback(false);
+    });
+}
+
+/**
+ * VERSIÓN ANTERIOR - Se mantiene por compatibilidad
+ */
+function syncOnlyNewAsignaciones(callback) {
+    syncWithPreview(callback);
 }
 
 /* NUEVA FUNCIÓN DE SINCRONIZACIÓN MASIVA MANUAL */
