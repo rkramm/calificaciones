@@ -3570,10 +3570,19 @@ function performLogout() {
     // Limpiar todos los event listeners para prevenir memory leaks
     cleanupAllListeners();
 
+    // Limpiar solo localStorage y sessionStorage (seguro)
+    try {
+        localStorage.clear();
+        sessionStorage.clear();
+    } catch (e) {
+        console.warn('⚠️ Error al limpiar storage:', e);
+    }
+
     toggleElement('main-screen', false);
     toggleElement('login-container', true);
     document.getElementById('username').value = '';
     document.getElementById('password').value = '';
+    document.getElementById('username').focus();
     if (countdownInterval) clearInterval(countdownInterval);
 }
 
