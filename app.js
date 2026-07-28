@@ -3570,12 +3570,31 @@ function performLogout() {
     // Limpiar todos los event listeners para prevenir memory leaks
     cleanupAllListeners();
 
-    // Limpiar solo localStorage y sessionStorage (seguro)
+    // Limpiar localStorage y sessionStorage
     try {
         localStorage.clear();
         sessionStorage.clear();
     } catch (e) {
         console.warn('⚠️ Error al limpiar storage:', e);
+    }
+
+    // Limpiar IndexedDB (especialmente importante para admin que cacheó datos sensibles)
+    if (currentRole === 'admin' && dbInstance) {
+        try {
+            const storeNames = ['configuracion', 'entidades', 'evaluadores', 'asignaciones', 'items', 'scores', 'historicos', 'asigna_historico'];
+            const tx = dbInstance.transaction(storeNames, 'readwrite');
+            storeNames.forEach(storeName => {
+                tx.objectStore(storeName).clear();
+            });
+            tx.oncomplete = () => {
+                console.log('✅ IndexedDB limpiado para admin');
+            };
+            tx.onerror = () => {
+                console.warn('⚠️ Error al limpiar IndexedDB');
+            };
+        } catch (e) {
+            console.warn('⚠️ Error limpiando IndexedDB:', e);
+        }
     }
 
     toggleElement('main-screen', false);
