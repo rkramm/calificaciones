@@ -241,10 +241,11 @@ let historicoScores = {};
 let historicoMemory = [];
 
 let adminSelectedProvincia = "";
-let adminTemporaryLogisticaMap = {}; 
+let adminTemporaryLogisticaMap = {};
 let adminTemporaryEntidades = [];
-let pendingAsignacionesStaging = []; 
+let pendingAsignacionesStaging = [];
 let currentScreenStaging = null;
+let newlyCreatedAsignacionIds = []; // Rastrear solo nuevas asignaciones para sync seguro
 let countdownInterval = null;
 let savedDeadlineISO = "";
 
@@ -1303,6 +1304,74 @@ function syncSingleStoreToCloud(storeName, callback, options = {}) {
         alert('Error al leer datos locales para sincronizar.');
         if (callback) callback(false);
     }
+}
+
+/**
+ * SEGURIDAD: Sincroniza SOLO las asignaciones nuevas creadas en esta sesión de admin
+ * Esto previene sobrescribir datos de otros evaluadores
+ */
+function syncOnlyNewAsignaciones(callback) {
+    if (!CLOUD_MODE_ENABLED) {
+        if (callback) callback(true);
+        return;
+    }
+
+    showProgressBar('Sincronizando nuevas asignaciones...');
+
+    // Obtener solo las asignaciones nuevas marcadas en esta sesión
+    const req = dbInstance.transaction(['asignaciones'], 'readonly').objectStore('asignaciones').getAll();
+    req.onsuccess = (e) => {
+        const allAsignaciones = e.target.result || [];
+        // Filtrar solo las que fueron creadas en esta sesión
+        const onlyNewOnes = allAsignaciones.filter(a => a._isNewThisSession === true);
+
+        console.log(`📤 Sincronizando ${onlyNewOnes.length} asignaciones nuevas de ${allAsignaciones.length} totales`);
+
+        // Si no hay nuevas, no hacer nada
+        if (onlyNewOnes.length === 0) {
+            hideProgressBar();
+            console.warn('⚠️ No hay asignaciones nuevas para sincronizar');
+            if (callback) callback(true);
+            return;
+        }
+
+        // Sincronizar solo las nuevas
+        cloudSave('asignaciones', onlyNewOnes, 'incremental', {}).then(res => {
+            hideProgressBar();
+            if (res && res.success) {
+                // Marcar como sincronizadas
+                const updateTx = dbInstance.transaction(['asignaciones'], 'readwrite');
+                onlyNewOnes.forEach(a => {
+                    updateTx.objectStore('asignaciones').put({ ...a, _isNewThisSession: false });
+                });
+                updateTx.oncomplete = () => {
+                    console.log('✅ Asignaciones nuevas sincronizadas correctamente');
+                    if (callback) callback(true);
+                };
+            } else if (res && res.versionConflict) {
+                handleVersionConflict('asignaciones', res).then(force => {
+                    if (force) {
+                        syncOnlyNewAsignaciones(callback);
+                    } else {
+                        if (callback) callback(false);
+                    }
+                });
+            } else {
+                alert(`Error al sincronizar: ${res ? res.error : 'Respuesta inválida'}`);
+                if (callback) callback(false);
+            }
+        }).catch(err => {
+            console.error('Error de red al sincronizar:', err);
+            hideProgressBar();
+            alert('Error de red. Verifique su conexión.');
+            if (callback) callback(false);
+        });
+    };
+    req.onerror = () => {
+        hideProgressBar();
+        alert('Error al leer datos locales.');
+        if (callback) callback(false);
+    };
 }
 
 /* NUEVA FUNCIÓN DE SINCRONIZACIÓN MASIVA MANUAL */
@@ -4587,12 +4656,15 @@ function executeCommitAsignacion() {
     const store = tx.objectStore('asignaciones');
 
     const writeOps = () => {
+        newlyCreatedAsignacionIds = []; // Resetear tracking
         allToSave.forEach(p => {
             p.ruts.forEach(rut => {
                 p.coberturas.forEach(c => {
                     // Convertir etapas a string usando | como separador (más seguro que comas)
                     const etapasStr = Array.isArray(p.etapas) ? p.etapas.join('|') : p.etapas;
-                    store.put({ idAsig: `${rut}_${c.programa}_${c.provincia.replace(/\s+/g, '')}_${c.entidadId || 'none'}`, rut, programa: c.programa, provincia: c.provincia, entidadId: c.entidadId, entidadNombre: c.entidadNombre, etapas: etapasStr });
+                    const idAsig = `${rut}_${c.programa}_${c.provincia.replace(/\s+/g, '')}_${c.entidadId || 'none'}`;
+                    newlyCreatedAsignacionIds.push(idAsig); // Rastrear lo nuevo
+                    store.put({ idAsig, rut, programa: c.programa, provincia: c.provincia, entidadId: c.entidadId, entidadNombre: c.entidadNombre, etapas: etapasStr, _isNewThisSession: true });
                 });
             });
         });
@@ -4606,11 +4678,11 @@ function executeCommitAsignacion() {
         };
     } else { writeOps(); }
 
-    tx.oncomplete = () => { 
+    tx.oncomplete = () => {
         closeModal(); pendingAsignacionesStaging = []; currentScreenStaging = null;
-        // Sincronizar asignaciones con la nube sin bloquear la UI
+        // Sincronizar SOLO las asignaciones nuevas creadas en esta sesión (no todo IndexedDB)
         if (CLOUD_MODE_ENABLED) {
-            syncSingleStoreToCloud('asignaciones', () => { populateAdminMatrix(); });
+            syncOnlyNewAsignaciones(() => { populateAdminMatrix(); });
         } else {
             populateAdminMatrix();
         }
