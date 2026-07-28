@@ -1,7 +1,7 @@
 /* ================= CONFIGURACIÓN DE ENTORNO WEB (GITHUB + GOOGLE SCRIPTS) ================= */
 // Las URLs sensibles y secrets se cargan desde config.js (no versionado)
 const CLOUD_MODE_ENABLED = CONFIG?.CLOUD_MODE_ENABLED ?? true;
-const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbxy3QXpPZg-2M9k9ZWWEwgYjjcbE2BDZf04kyP5svJa83v5dAS4bI-TSUZv5keM9WjWLA/exec";
+const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbwiFcJeWUpq6bh5H2zEkxPga-HKX4TyHPXiFXhHtu03NuAeaa2mlmAZ0NG2PYu9ZLc3LQ/exec";
 
 // Sistema de rate limiting para login
 let loginAttempts = {};
@@ -4024,6 +4024,7 @@ function renderStagesForEvaluator(asignaciones) {
     }
 
     container.innerHTML = '';
+    container.style.cssText = 'display: flex; flex-wrap: wrap; gap: 8px; align-items: center;';
 
     etapas.forEach(stageNum => {
         const badge = document.createElement('div');
