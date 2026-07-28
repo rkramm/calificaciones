@@ -3570,11 +3570,36 @@ function performLogout() {
     // Limpiar todos los event listeners para prevenir memory leaks
     cleanupAllListeners();
 
+    // Limpiar localStorage y sessionStorage
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // Limpiar IndexedDB
+    if (window.indexedDB) {
+        try {
+            const dbRequest = indexedDB.databases ? indexedDB.databases() : null;
+            if (dbRequest && dbRequest.then) {
+                dbRequest.then(dbs => {
+                    dbs.forEach(db => {
+                        indexedDB.deleteDatabase(db.name);
+                    });
+                });
+            }
+        } catch (e) {
+            console.warn('⚠️ Error al limpiar IndexedDB:', e);
+        }
+    }
+
     toggleElement('main-screen', false);
     toggleElement('login-container', true);
     document.getElementById('username').value = '';
     document.getElementById('password').value = '';
     if (countdownInterval) clearInterval(countdownInterval);
+
+    // Recargar página para limpiar estado de JavaScript en memoria
+    setTimeout(() => {
+        window.location.reload();
+    }, 300);
 }
 
 function showPanel(titleText) {
