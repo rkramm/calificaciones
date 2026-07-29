@@ -6908,8 +6908,10 @@ function continuarExportPDF() {
 
         // Procesar todas las etapas de esta entidad
         entidadAsignaciones.forEach(asig => {
-            asig.etapas.forEach(stg => {
-            const stageRecords = allMemoryScores.filter(r => r.cobertura === asig.cobertura && r.stage === stg);
+            // FIX: asig.etapas es STRING ("1|2|3"), no array - parsear correctamente
+            const etapasArray = typeof asig.etapas === 'string' ? asig.etapas.split('|').map(e => parseInt(e, 10)) : asig.etapas;
+            etapasArray.forEach(stg => {
+            const stageRecords = allMemoryScores.filter(r => r.cobertura === asig.cobertura && r.stage === parseInt(stg, 10));
             let lastEvalDate = "Sin registro";
             let maxTs = 0;
             stageRecords.forEach(r => {
