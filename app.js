@@ -5647,20 +5647,19 @@ function saveEvaluatorScores(callback, options = {}) {
             }
         }
 
-        // IMPORTANTE: Guardar TODOS los registros modificados del usuario actual en la cobertura actual
-        // SIN limitar por una sola entidad, ya que el usuario pudo haber calificado múltiples entidades
+        // CRÍTICO: Guardar TODOS los scores > 0, no solo los marcados como modificado
+        // Problema: cuando cambias de entidad sin guardar, los scores anteriores no se marcan como modificado
+        // Solución: guardar CUALQUIER score que sea > 0 (intentos válidos de calificación)
         const recordsToSave = allMemoryScores
             .filter(r => {
                 // Incluir si:
                 // 1. Es del usuario actual
                 // 2. Es de la cobertura actual
-                // 3. Tiene un valor > 0 (ya guardado en allMemoryScores)
-                // 4. Fue modificado desde la última sincronización (OPTIMIZACIÓN)
-                // NOTA: NO filtramos por entidad para permitir guardar múltiples entidades
+                // 3. Tiene un valor > 0 (calificación válida)
+                // NOTA: NO filtrar por modificado - todos los scores > 0 deben guardarse
                 const passes = r.rutEvaluador === currentUser.rut &&
                                r.cobertura === currentCoverage &&
-                               r.score > 0 &&
-                               r.modificado === true;
+                               r.score > 0;
 
                 if (passes) {
                     console.log(`📌 Record a guardar: entidad=${r.entidad}, itemId=${r.itemId}, score=${r.score}`);
