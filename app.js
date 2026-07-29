@@ -6081,8 +6081,11 @@ function calculateLiveScore() {
         totalStage += val; countStage++;
 
         if (existingIdx >= 0) {
+            // Solo marcar como modificado si el valor REALMENTE cambió
+            if (allMemoryScores[existingIdx].score !== val) {
+                allMemoryScores[existingIdx].modificado = true;
+            }
             allMemoryScores[existingIdx].score = val;
-            allMemoryScores[existingIdx].modificado = true;  // Marcar como cambiado
         } else {
             const activeAsig = allAsignacionesMapped.find(a =>
                 a.cobertura === currentCoverage && a.entidadNombre === window.currentSelectedEntity
