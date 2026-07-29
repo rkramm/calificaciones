@@ -6867,10 +6867,16 @@ function applyConflictResolution(added, removed, modified, remoteData) {
 
 /* ================= EXPORTACIÓN A PDF DEL EVALUADOR ================= */
 function exportEvaluatorPDF() {
-    // Guardar automáticamente sin mostrar notificaciones (será silencioso)
-    saveEvaluatorScores(() => {
+    // Si ya está guardado, exportar directamente. Si hay cambios, guardar primero.
+    if (!hasUnsavedEvaluatorChanges) {
+        // Ya está guardado, exportar directamente
         continuarExportPDF();
-    }, { silent: true });
+    } else {
+        // Hay cambios, guardar automáticamente sin mostrar notificaciones
+        saveEvaluatorScores(() => {
+            continuarExportPDF();
+        }, { silent: true });
+    }
 }
 
 function continuarExportPDF() {
