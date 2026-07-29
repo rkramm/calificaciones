@@ -6870,11 +6870,10 @@ function applyConflictResolution(added, removed, modified, remoteData) {
 
 /* ================= EXPORTACIÓN A PDF DEL EVALUADOR ================= */
 function exportEvaluatorPDF() {
-    // Guardar automáticamente sin mostrar notificaciones (será silencioso)
-    // Nota: saveEvaluatorScores() es eficiente - solo envía cambios reales
-    saveEvaluatorScores(() => {
-        continuarExportPDF();
-    }, { silent: true });
+    // IMPORTANTE: No guardar automáticamente. El PDF debe mostrar lo que YA ESTÁ GUARDADO en Google Sheets.
+    // Si el usuario quiere guardar cambios, debe hacer click en "Guardar" primero.
+    // Exportar directamente sin guardar nuevamente.
+    continuarExportPDF();
 }
 
 function continuarExportPDF() {
