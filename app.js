@@ -5647,25 +5647,31 @@ function saveEvaluatorScores(callback, options = {}) {
             }
         }
 
-        // CRÍTICO: Guardar TODOS los scores > 0, no solo los marcados como modificado
-        // Problema: cuando cambias de entidad sin guardar, los scores anteriores no se marcan como modificado
-        // Solución: guardar CUALQUIER score que sea > 0 (intentos válidos de calificación)
+        // CRÍTICO: Guardar TODOS los scores > 0 de TODAS las entidades del usuario en cobertura actual
+        // Problema: cuando cambias entre entidades, scores de entidades anteriores no se guardaban
+        // Solución: guardar TODOS los scores > 0 sin importar entidad/etapa (solo filtrar por usuario+cobertura)
+        console.log(`🔍 DEBUG saveEvaluatorScores: buscando scores de ${currentUser.rut} en cobertura "${currentCoverage}"`);
+        console.log(`   Total en allMemoryScores: ${allMemoryScores.length}`);
+
         const recordsToSave = allMemoryScores
             .filter(r => {
                 // Incluir si:
                 // 1. Es del usuario actual
-                // 2. Es de la cobertura actual
+                // 2. Es de la cobertura actual (programa - provincia)
                 // 3. Tiene un valor > 0 (calificación válida)
-                // NOTA: NO filtrar por modificado - todos los scores > 0 deben guardarse
+                // NOTA: NO filtrar por entidad, etapa, ni modificado
+                // Esto permite guardar múltiples entidades en la misma cobertura
                 const passes = r.rutEvaluador === currentUser.rut &&
                                r.cobertura === currentCoverage &&
                                r.score > 0;
 
                 if (passes) {
-                    console.log(`📌 Record a guardar: entidad=${r.entidad}, itemId=${r.itemId}, score=${r.score}`);
+                    console.log(`📌 Record a guardar: entidad=${r.entidad}, stage=${r.stage}, itemId=${r.itemId}, score=${r.score}`);
                 }
                 return passes;
             });
+
+        console.log(`✅ Total records a guardar: ${recordsToSave.length}`);
             // NOTA: NO se re-sincroniza con currentInputValues aquí porque ese objeto está
             // indexado SOLO por itemId (sin entidad), lo que sobrescribía el score de TODOS
             // los registros con ese itemId sin importar la entidad. calculateLiveScore() ya
