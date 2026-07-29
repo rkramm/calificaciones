@@ -5583,8 +5583,12 @@ function saveEvaluatorScores(callback, options = {}) {
             showToast('Guardando...', 'info');
         }
 
-        // SINCRONIZAR: ejecutar calculateLiveScore() para que los inputs vacíos se reflejen en allMemoryScores
-        calculateLiveScore();
+        // CRÍTICO: NO llamar calculateLiveScore() aquí porque:
+        // 1. calculateLiveScore() solo procesa inputs VISIBLES (entidad actual)
+        // 2. Si usuario ingresó datos en ENTIDAD A, luego cambió a ENTIDAD B,
+        //    calculateLiveScore() sobrescribiría allMemoryScores solo con datos de ENTIDAD B
+        // 3. allMemoryScores ya se actualiza en tiempo real via input listeners
+        // 4. Guardar debe usar allMemoryScores como está (completo, múltiples entidades)
 
         // Google Sheets es la ÚNICA fuente de datos
         // Filtrar: solo guardar scores con valor > 0 (scores con 0 = no evaluado)
