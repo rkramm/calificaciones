@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:\\\\Users\\\\rkramm\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-rkramm-OneDrive---Ministerio-de-Vivienda-y-Urbanismo-Proyectos-Calificaciones-EP-2026-V1\\\\08557c6c-fbaa-440d-aa6d-ea1389f7a75d\\\\scratchpad\" && \\\\ *)",
+      "Bash(sed 's/var reduceMotion = window.matchMedia && window.matchMedia\\('\\\\''\\(prefers-reduced-motion: reduce\\)'\\\\''\\).matches;/var reduceMotion = true;/' 'C:\\\\Users\\\\rkramm\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-rkramm-OneDrive---Ministerio-de-Vivienda-y-Urbanismo-Proyectos-Calificaciones-EP-2026-V1\\\\08557c6c-fbaa-440d-aa6d-ea1389f7a75d\\\\scratchpad\\\\presentacion-evaluadores.html')",
+      "Bash(echo \"<script>window.addEventListener\\('load', function\\(\\){ setTimeout\\(function\\(\\){ document.getElementById\\('dots'\\).children[1].click\\(\\); }, 100\\); }\\);</script>\")",
+      "Bash(echo \"<style>*{transition:none !important;animation:none !important;}</style>\")"
+    ]
+  }
+}

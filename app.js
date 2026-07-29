@@ -6914,12 +6914,7 @@ function continuarExportPDF() {
             // FIX: asig.etapas es STRING ("1|2|3"), no array - parsear correctamente
             const etapasArray = typeof asig.etapas === 'string' ? asig.etapas.split('|').map(e => parseInt(e, 10)) : asig.etapas;
             etapasArray.forEach(stg => {
-            // CRÍTICO: Filtrar por ENTIDAD además de cobertura y etapa (no solo por RUT)
-            const stageRecords = allMemoryScores.filter(r =>
-                r.cobertura === asig.cobertura &&
-                r.stage === parseInt(stg, 10) &&
-                r.entidad === nombreEntidad  // Filtrar por la entidad específica de este grupo
-            );
+            const stageRecords = allMemoryScores.filter(r => r.cobertura === asig.cobertura && r.stage === parseInt(stg, 10));
             let lastEvalDate = "Sin registro";
             let maxTs = 0;
             stageRecords.forEach(r => {
