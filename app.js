@@ -6921,9 +6921,16 @@ function continuarExportPDFWithData(freshScores) {
         entidadesMap[entidad].push(asig);
     });
 
+    // DEBUG: Mostrar qué entidades se están procesando
+    console.log('🔍 continuarExportPDFWithData - Entidades a procesar:', Object.keys(entidadesMap));
+    console.log('📊 freshScores total:', freshScores.length);
+    console.log('📋 Entidades únicas en freshScores:', [...new Set(freshScores.map(r => r.entidad))]);
+
     // Procesar cada entidad
     Object.keys(entidadesMap).forEach((nombreEntidad, entidadIdx) => {
         const entidadAsignaciones = entidadesMap[nombreEntidad];
+        console.log(`\n🏢 Procesando ENTIDAD: "${nombreEntidad}"`);
+        console.log(`   Asignaciones: ${entidadAsignaciones.length}`);
 
         // Encabezado de entidad separado y destacado
         contentHtml += `
@@ -6945,6 +6952,20 @@ function continuarExportPDFWithData(freshScores) {
                 r.stage === parseInt(stg, 10) &&
                 r.entidad === nombreEntidad
             );
+
+            if (stg === 4) {
+                console.log(`   ETAPA ${stg} - Buscando: rut=${currentUser.rut}, cobertura=${asig.cobertura}, entidad="${nombreEntidad}"`);
+                console.log(`   Encontrados: ${stageRecords.length} registros`);
+                if (stageRecords.length === 0) {
+                    console.log(`   ⚠️ Sin resultados. Verificando qué hay en freshScores para esta cobertura/etapa:`);
+                    const debugRecords = freshScores.filter(r =>
+                        r.rutEvaluador === currentUser.rut &&
+                        r.cobertura === asig.cobertura &&
+                        r.stage === parseInt(stg, 10)
+                    );
+                    debugRecords.forEach(r => console.log(`       - entidad="${r.entidad}"`));
+                }
+            }
             let lastEvalDate = "Sin registro";
             let maxTs = 0;
             stageRecords.forEach(r => {
