@@ -6870,13 +6870,27 @@ function applyConflictResolution(added, removed, modified, remoteData) {
 
 /* ================= EXPORTACIÓN A PDF DEL EVALUADOR ================= */
 function exportEvaluatorPDF() {
-    // IMPORTANTE: No guardar automáticamente. El PDF debe mostrar lo que YA ESTÁ GUARDADO en Google Sheets.
-    // Si el usuario quiere guardar cambios, debe hacer click en "Guardar" primero.
-    // Exportar directamente sin guardar nuevamente.
-    continuarExportPDF();
+    // CRÍTICO: Leer datos FRESCOS de Google Sheets, no de allMemoryScores cacheado
+    // Esto evita duplicaciones y garantiza datos correctos
+    showProgressBar('Obteniendo datos frescos de Google Sheets...');
+
+    cloudGet('scores').then(freshScores => {
+        hideProgressBar();
+        if (!freshScores) {
+            notificationSystem.show('pdf-export-error', '❌ Error: No se pudieron obtener datos de Google Sheets', 'error');
+            return;
+        }
+
+        // Usar datos frescos, NO allMemoryScores
+        continuarExportPDFWithData(freshScores);
+    }).catch(err => {
+        hideProgressBar();
+        console.error('Error obteniendo datos para PDF:', err);
+        notificationSystem.show('pdf-export-error', '❌ Error al obtener datos', 'error');
+    });
 }
 
-function continuarExportPDF() {
+function continuarExportPDFWithData(freshScores) {
     const exportDate = formatDateTime(new Date());
     const printContainer = document.createElement('div');
     printContainer.id = 'pdf-print-container';
@@ -6887,9 +6901,10 @@ function continuarExportPDF() {
         </div>
     `;
 
-    // Agrupar asignaciones por entidad
+    // Agrupar asignaciones por entidad - SOLO las del usuario actual
     const entidadesMap = {};
-    allAsignacionesMapped.forEach(asig => {
+    const userAsignaciones = allAsignacionesMapped.filter(a => a.rut === currentUser.rut);
+    userAsignaciones.forEach(asig => {
         const entidad = asig.entidadNombre || "Sin especificar";
         if (!entidadesMap[entidad]) {
             entidadesMap[entidad] = [];
@@ -6914,7 +6929,13 @@ function continuarExportPDF() {
             // FIX: asig.etapas es STRING ("1|2|3"), no array - parsear correctamente
             const etapasArray = typeof asig.etapas === 'string' ? asig.etapas.split('|').map(e => parseInt(e, 10)) : asig.etapas;
             etapasArray.forEach(stg => {
-            const stageRecords = allMemoryScores.filter(r => r.cobertura === asig.cobertura && r.stage === parseInt(stg, 10));
+            // CRÍTICO: Filtrar por datos FRESCOS de Google Sheets, no de allMemoryScores cacheado
+            const stageRecords = freshScores.filter(r =>
+                r.rutEvaluador === currentUser.rut &&
+                r.cobertura === asig.cobertura &&
+                r.stage === parseInt(stg, 10) &&
+                r.entidad === nombreEntidad
+            );
             let lastEvalDate = "Sin registro";
             let maxTs = 0;
             stageRecords.forEach(r => {
