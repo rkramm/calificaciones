@@ -6912,67 +6912,68 @@ function exportEvaluatorPDF() {
         doc.line(marg, y, pageW - marg, y);
         y += 5;
 
-        // Leer tabla del DOM
-        const tbody = document.querySelector('table tbody');
-        if (!tbody) {
-            notificationSystem.show('pdf-export', '❌ No hay datos para exportar', 'error');
+        // Leer items y scores de allMemoryScores
+        if (!allMemoryScores || allMemoryScores.length === 0) {
+            notificationSystem.show('pdf-export', '❌ No hay datos guardados para exportar', 'error');
             return;
         }
 
-        const rows = tbody.querySelectorAll('tr');
-        let currentStage = null;
+        // Obtener items únicos de dbItems
+        const itemsByStage = {};
+        dbItems.forEach(item => {
+            const stage = parseInt(item.stage, 10);
+            if (!itemsByStage[stage]) itemsByStage[stage] = [];
+            itemsByStage[stage].push(item);
+        });
+
+        // Procesar cada etapa
+        const stages = Object.keys(itemsByStage).map(Number).sort((a, b) => a - b);
         let stageColor = 0;
         const colors = ['#E8F4F8', '#F0F8E8'];
 
-        rows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length < 3) return;
+        stages.forEach(stage => {
+            const bgColor = colors[stageColor % 2];
+            stageColor++;
 
-            const itemId = cells[0].textContent.trim();
-            const itemText = cells[1].textContent.trim();
-            const score = cells[2].querySelector('input')?.value || cells[2].textContent.trim() || '-';
-
-            const stage = itemId.split('.')[0];
-            if (stage !== currentStage) {
-                if (currentStage !== null) y += 5;
-
-                currentStage = stage;
-                const bgColor = colors[stageColor % 2];
-                stageColor++;
-
-                doc.setFillColor(parseInt(bgColor.slice(1, 3), 16), parseInt(bgColor.slice(3, 5), 16), parseInt(bgColor.slice(5, 7), 16));
-                doc.rect(marg, y, w, 7, 'F');
-                doc.setFont('Helvetica', 'bold');
-                doc.setFontSize(11);
-                doc.setTextColor(44, 62, 107);
-                doc.text(`ETAPA ${stage}`, marg + 2, y + 5);
-                y += 8;
-
-                doc.setDrawColor(200, 200, 200);
-                doc.line(marg, y - 1, pageW - marg, y - 1);
-            }
-
-            if (y > pageH - 15) {
-                doc.addPage();
-                y = 15;
-            }
-
-            doc.setFont('Helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(0, 0, 0);
-            doc.setDrawColor(220, 220, 220);
-            doc.rect(marg, y, 12, 5);
-            doc.rect(marg + 12, y, w - 27, 5);
-            doc.rect(marg + w - 15, y, 15, 5);
-
-            doc.text(itemId, marg + 1, y + 3.5);
-            const lines = doc.splitTextToSize(itemText, w - 27 - 4);
-            doc.text(lines, marg + 14, y + 3.5);
-
+            doc.setFillColor(parseInt(bgColor.slice(1, 3), 16), parseInt(bgColor.slice(3, 5), 16), parseInt(bgColor.slice(5, 7), 16));
+            doc.rect(marg, y, w, 7, 'F');
             doc.setFont('Helvetica', 'bold');
+            doc.setFontSize(11);
             doc.setTextColor(44, 62, 107);
-            doc.text(String(score), marg + w - 13, y + 3.5);
-            y += 5;
+            doc.text(`ETAPA ${stage}`, marg + 2, y + 5);
+            y += 8;
+
+            doc.setDrawColor(200, 200, 200);
+            doc.line(marg, y - 1, pageW - marg, y - 1);
+
+            itemsByStage[stage].forEach(item => {
+                if (y > pageH - 15) {
+                    doc.addPage();
+                    y = 15;
+                }
+
+                const scoreRecord = allMemoryScores.find(s => s.itemId === item.id && s.stage === stage);
+                const score = scoreRecord && scoreRecord.score ? String(scoreRecord.score) : '-';
+
+                doc.setFont('Helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.setTextColor(0, 0, 0);
+                doc.setDrawColor(220, 220, 220);
+                doc.rect(marg, y, 12, 5);
+                doc.rect(marg + 12, y, w - 27, 5);
+                doc.rect(marg + w - 15, y, 15, 5);
+
+                doc.text(item.id, marg + 1, y + 3.5);
+                const lines = doc.splitTextToSize(item.text, w - 27 - 4);
+                doc.text(lines, marg + 14, y + 3.5);
+
+                doc.setFont('Helvetica', 'bold');
+                doc.setTextColor(44, 62, 107);
+                doc.text(score, marg + w - 13, y + 3.5);
+                y += 5;
+            });
+
+            y += 3;
         });
 
         const filename = `Calificaciones_${currentUser.rut}_${Date.now()}.pdf`;
