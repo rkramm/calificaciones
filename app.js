@@ -6885,35 +6885,72 @@ function exportEvaluatorPDF() {
             return;
         }
 
-        const coverageText = document.querySelector('[id*="coverage"]')?.textContent || 'N/A';
-        const entityText = window.currentSelectedEntity || 'N/A';
-
         const data = [];
         data.push(['REPORTE DE CALIFICACIONES']);
-        data.push(['']);
         data.push(['Evaluador:', currentUser.nombre + ' (' + currentUser.rut + ')']);
-        data.push(['Cobertura:', coverageText]);
-        data.push(['Entidad:', entityText]);
         data.push(['Fecha:', new Date().toLocaleDateString('es-CL')]);
         data.push(['']);
-        data.push(['Etapa', 'Item', 'Descripción', 'Calificación']);
 
-        const itemsByStage = {};
-        dbItems.forEach(item => {
-            const stage = parseInt(item.stage, 10);
-            if (!itemsByStage[stage]) itemsByStage[stage] = [];
-            itemsByStage[stage].push(item);
+        // Agrupar por entidad
+        const byEntity = {};
+        allMemoryScores.forEach(score => {
+            const entity = score.entidad || 'Sin entidad';
+            if (!byEntity[entity]) byEntity[entity] = [];
+            byEntity[entity].push(score);
         });
 
-        const stages = Object.keys(itemsByStage).map(Number).sort((a, b) => a - b);
+        // Procesar cada entidad
+        Object.keys(byEntity).sort().forEach(entityName => {
+            data.push(['═══════════════════════════════════════════']);
+            data.push(['ENTIDAD:', entityName]);
+            data.push(['═══════════════════════════════════════════']);
+            data.push(['']);
 
-        stages.forEach(stage => {
-            itemsByStage[stage].forEach(item => {
-                const scoreRecord = allMemoryScores.find(s => s.itemId === item.id && s.stage === stage);
-                const score = scoreRecord && scoreRecord.score ? scoreRecord.score : '';
+            const entityScores = byEntity[entityName];
 
-                data.push([stage, item.id, item.text, score]);
+            // Agrupar por cobertura dentro de la entidad
+            const byCobertura = {};
+            entityScores.forEach(score => {
+                const cob = score.cobertura || 'Sin cobertura';
+                if (!byCobertura[cob]) byCobertura[cob] = [];
+                byCobertura[cob].push(score);
             });
+
+            // Procesar cada cobertura
+            Object.keys(byCobertura).sort().forEach(coberturaName => {
+                data.push(['']);
+                data.push(['PROGRAMA/COBERTURA:', coberturaName]);
+                data.push(['']);
+
+                const coberturaScores = byCobertura[coberturaName];
+
+                // Agrupar por etapa
+                const byStage = {};
+                coberturaScores.forEach(score => {
+                    const stage = score.stage || 0;
+                    if (!byStage[stage]) byStage[stage] = [];
+                    byStage[stage].push(score);
+                });
+
+                // Procesar cada etapa
+                Object.keys(byStage).map(Number).sort((a, b) => a - b).forEach(stageNum => {
+                    data.push(['']);
+                    data.push(['ETAPA ' + stageNum]);
+                    data.push(['Ítem', 'Descripción', 'Calificación']);
+
+                    const stageScores = byStage[stageNum];
+
+                    // Obtener items de esta etapa
+                    const stageItems = dbItems.filter(i => parseInt(i.stage, 10) === stageNum);
+                    stageItems.forEach(item => {
+                        const scoreRecord = stageScores.find(s => s.itemId === item.id);
+                        const score = scoreRecord && scoreRecord.score ? scoreRecord.score : '';
+                        data.push([item.id, item.text, score]);
+                    });
+                });
+            });
+
+            data.push(['']);
         });
 
         const XLSX = window.XLSX || window.xlsx;
@@ -6924,9 +6961,8 @@ function exportEvaluatorPDF() {
 
         const worksheet = XLSX.utils.aoa_to_sheet(data);
         worksheet['!cols'] = [
-            { wch: 8 },
-            { wch: 8 },
-            { wch: 50 },
+            { wch: 10 },
+            { wch: 55 },
             { wch: 12 }
         ];
 
