@@ -3,9 +3,9 @@
  * Script dedicado SOLO a la exportación de datos para análisis y dashboard
  * NO modifica datos, SOLO lectura
  * Puede deployarse independientemente sin afectar el sistema de calificaciones
+ *
+ * Nota: Usa SPREADSHEET_ID definido en Code.gs (no duplicar)
  */
-
-const SPREADSHEET_ID = '1apPfP7Y3ancW166QGEvh07kESYjuV8sP-Wd14cnQjjo';
 
 /**
  * Endpoint público: Devuelve datos de 'scores' para dashboard
