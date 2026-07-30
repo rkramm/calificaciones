@@ -6966,6 +6966,27 @@ function exportEvaluatorPDF() {
             { wch: 12 }
         ];
 
+        // Proteger hoja para que sea de solo lectura
+        worksheet['!protect'] = {
+            sheet: true,
+            content: true,
+            objects: true,
+            scenarios: true,
+            formatCells: false,
+            formatColumns: false,
+            formatRows: false,
+            insertColumns: false,
+            insertRows: false,
+            insertHyperlinks: false,
+            deleteColumns: false,
+            deleteRows: false,
+            sort: false,
+            autoFilter: false,
+            pivotTables: false,
+            selectLockedCells: true,
+            selectUnlockedCells: true
+        };
+
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Calificaciones');
 
