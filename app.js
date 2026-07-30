@@ -6879,29 +6879,12 @@ function applyConflictResolution(added, removed, modified, remoteData) {
 
 /* ================= EXPORTACIÓN A PDF DEL EVALUADOR ================= */
 function exportEvaluatorPDF() {
-    // CRÍTICO: Leer datos FRESCOS de Google Sheets, no de allMemoryScores cacheado
-    // Esto evita duplicaciones y garantiza datos correctos
-    showProgressBar('Obteniendo datos frescos de Google Sheets...');
-
-    cloudGet('scores').then(freshScores => {
-        hideProgressBar();
-        if (!freshScores) {
-            notificationSystem.show('pdf-export-error', '❌ Error: No se pudieron obtener datos de Google Sheets', 'error');
-            return;
-        }
-
-        // Usar datos frescos, NO allMemoryScores
-        continuarExportPDFWithData(freshScores);
-    }).catch(err => {
-        hideProgressBar();
-        console.error('Error obteniendo datos para PDF:', err);
-        notificationSystem.show('pdf-export-error', '❌ Error al obtener datos', 'error');
-    });
+    showProgressBar('Generando reporte PDF...');
+    hideProgressBar();
+    continuarExportPDFWithData();
 }
 
-function continuarExportPDFWithData(freshScores) {
-    showProgressBar('Generando PDF...');
-
+function continuarExportPDFWithData() {
     try {
         const doc = new window.jspdf.jsPDF({
             orientation: 'portrait',
@@ -6950,12 +6933,12 @@ function continuarExportPDFWithData(freshScores) {
         const stageColors = ['#E8F4F8', '#F0F8E8'];
         let stageColorIdx = 0;
 
-        // Procesar cada etapa
+        // Procesar cada etapa - usar allMemoryScores que ya están guardados
         etapas.forEach(stageNum => {
             const stageMeta = STAGES_METADATA[stageNum] || { title: `ETAPA ${stageNum}`, desc: '' };
 
-            // Filtrar scores para esta etapa y entidad
-            const stageScores = freshScores.filter(r =>
+            // Filtrar scores de allMemoryScores para esta etapa y entidad
+            const stageScores = allMemoryScores.filter(r =>
                 r.rutEvaluador === currentUser.rut &&
                 r.cobertura === currentSelectedCoverage &&
                 r.stage === stageNum &&
@@ -7057,7 +7040,6 @@ function continuarExportPDFWithData(freshScores) {
         const filename = `Calificaciones_${currentUser.rut}_${new Date().getTime()}.pdf`;
         doc.save(filename);
 
-        hideProgressBar();
         notificationSystem.show('pdf-export', '✅ PDF exportado correctamente', 'success');
         setTimeout(() => {
             notificationSystem.remove('pdf-export');
@@ -7065,8 +7047,7 @@ function continuarExportPDFWithData(freshScores) {
 
     } catch (error) {
         console.error('Error generando PDF:', error);
-        hideProgressBar();
-        notificationSystem.show('pdf-export', '❌ Error al generar PDF', 'error');
+        notificationSystem.show('pdf-export', '❌ Error al generar PDF: ' + error.message, 'error');
     }
 }
 
