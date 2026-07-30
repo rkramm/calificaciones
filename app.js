@@ -6936,12 +6936,17 @@ function exportEvaluatorPDF() {
             stageColor++;
 
             doc.setFillColor(parseInt(bgColor.slice(1, 3), 16), parseInt(bgColor.slice(3, 5), 16), parseInt(bgColor.slice(5, 7), 16));
-            doc.rect(marg, y, w, 7, 'F');
+            doc.rect(marg, y, w, 10, 'F');
             doc.setFont('Helvetica', 'bold');
             doc.setFontSize(11);
             doc.setTextColor(44, 62, 107);
-            doc.text(`ETAPA ${stage}`, marg + 2, y + 5);
-            y += 8;
+            doc.text(`ETAPA ${stage}`, marg + 2, y + 4);
+            y += 5;
+
+            doc.setFont('Helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.text(`Cobertura: ${coverageText} | Entidad: ${entityText}`, marg + 2, y + 3);
+            y += 5;
 
             doc.setDrawColor(200, 200, 200);
             doc.line(marg, y - 1, pageW - marg, y - 1);
