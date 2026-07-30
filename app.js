@@ -6879,175 +6879,111 @@ function applyConflictResolution(added, removed, modified, remoteData) {
 
 /* ================= EXPORTACIÓN A PDF DEL EVALUADOR ================= */
 function exportEvaluatorPDF() {
-    showProgressBar('Generando reporte PDF...');
-    hideProgressBar();
-    continuarExportPDFWithData();
-}
-
-function continuarExportPDFWithData() {
     try {
-        const doc = new window.jspdf.jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'letter'
-        });
-
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        let currentY = 15;
-        const margin = 10;
-        const contentWidth = pageWidth - 2 * margin;
+        const doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        let y = 15;
+        const marg = 10;
+        const w = pageW - 2 * marg;
 
         // Encabezado
         doc.setFont('Helvetica', 'bold');
         doc.setFontSize(14);
-        doc.text('REPORTE DE CALIFICACIONES', margin, currentY);
+        doc.text('REPORTE DE CALIFICACIONES', marg, y);
+        y += 8;
 
-        currentY += 8;
         doc.setFontSize(10);
         doc.setFont('Helvetica', 'normal');
-        doc.text(`Evaluador: ${currentUser.nombre} (${currentUser.rut})`, margin, currentY);
-        currentY += 5;
-        doc.text(`Cobertura: ${currentSelectedCoverage}`, margin, currentY);
-        currentY += 5;
-        doc.text(`Entidad: ${window.currentSelectedEntity || 'No seleccionada'}`, margin, currentY);
-        currentY += 5;
-        doc.text(`Fecha: ${formatDateTime(new Date())}`, margin, currentY);
+        doc.text(`Evaluador: ${currentUser.nombre} (${currentUser.rut})`, marg, y);
+        y += 5;
 
-        // Línea divisoria
-        currentY += 8;
+        const coverageText = document.querySelector('[id*="coverage"]')?.textContent || 'N/A';
+        const entityText = document.querySelector('[id*="entity"]')?.textContent || window.currentSelectedEntity || 'N/A';
+
+        doc.text(`Cobertura: ${coverageText}`, marg, y);
+        y += 5;
+        doc.text(`Entidad: ${entityText}`, marg, y);
+        y += 5;
+        doc.text(`Fecha: ${new Date().toLocaleDateString('es-CL')}`, marg, y);
+
+        y += 8;
         doc.setDrawColor(44, 62, 107);
-        doc.line(margin, currentY, pageWidth - margin, currentY);
-        currentY += 5;
+        doc.line(marg, y, pageW - marg, y);
+        y += 5;
 
-        // Obtener etapas relevantes del usuario actual
-        const userAsignaciones = allAsignacionesMapped.filter(a => a.rut === currentUser.rut && a.cobertura === currentSelectedCoverage);
-        const etapasSet = new Set();
-        userAsignaciones.forEach(asig => {
-            const etapasArray = typeof asig.etapas === 'string' ? asig.etapas.split('|').map(e => parseInt(e, 10)) : asig.etapas;
-            etapasArray.forEach(e => etapasSet.add(e));
-        });
-        const etapas = Array.from(etapasSet).sort((a, b) => a - b);
+        // Leer tabla del DOM
+        const tbody = document.querySelector('table tbody');
+        if (!tbody) {
+            notificationSystem.show('pdf-export', '❌ No hay datos para exportar', 'error');
+            return;
+        }
 
-        // Colores alternados por etapa
-        const stageColors = ['#E8F4F8', '#F0F8E8'];
-        let stageColorIdx = 0;
+        const rows = tbody.querySelectorAll('tr');
+        let currentStage = null;
+        let stageColor = 0;
+        const colors = ['#E8F4F8', '#F0F8E8'];
 
-        // Procesar cada etapa - usar allMemoryScores que ya están guardados
-        etapas.forEach(stageNum => {
-            const stageMeta = STAGES_METADATA[stageNum] || { title: `ETAPA ${stageNum}`, desc: '' };
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length < 3) return;
 
-            // Filtrar scores de allMemoryScores para esta etapa y entidad
-            const stageScores = allMemoryScores.filter(r =>
-                r.rutEvaluador === currentUser.rut &&
-                r.cobertura === currentSelectedCoverage &&
-                r.stage === stageNum &&
-                r.entidad === window.currentSelectedEntity
-            );
+            const itemId = cells[0].textContent.trim();
+            const itemText = cells[1].textContent.trim();
+            const score = cells[2].querySelector('input')?.value || cells[2].textContent.trim() || '-';
 
-            if (stageScores.length === 0) return; // Saltar si no hay datos
+            const stage = itemId.split('.')[0];
+            if (stage !== currentStage) {
+                if (currentStage !== null) y += 5;
 
-            // Encabezado de etapa con color de fondo
-            const stageColor = stageColors[stageColorIdx % 2];
-            stageColorIdx++;
+                currentStage = stage;
+                const bgColor = colors[stageColor % 2];
+                stageColor++;
 
-            doc.setFillColor(parseInt(stageColor.slice(1, 3), 16), parseInt(stageColor.slice(3, 5), 16), parseInt(stageColor.slice(5, 7), 16));
-            doc.rect(margin, currentY, contentWidth, 8, 'F');
+                doc.setFillColor(parseInt(bgColor.slice(1, 3), 16), parseInt(bgColor.slice(3, 5), 16), parseInt(bgColor.slice(5, 7), 16));
+                doc.rect(marg, y, w, 7, 'F');
+                doc.setFont('Helvetica', 'bold');
+                doc.setFontSize(11);
+                doc.setTextColor(44, 62, 107);
+                doc.text(`ETAPA ${stage}`, marg + 2, y + 5);
+                y += 8;
 
-            doc.setFont('Helvetica', 'bold');
-            doc.setFontSize(11);
-            doc.setTextColor(44, 62, 107);
-            doc.text(`ETAPA ${stageNum} - ${stageMeta.title}`, margin + 2, currentY + 5.5);
-            currentY += 10;
+                doc.setDrawColor(200, 200, 200);
+                doc.line(marg, y - 1, pageW - marg, y - 1);
+            }
 
-            // Línea divisoria ligera
-            doc.setDrawColor(200, 200, 200);
-            doc.line(margin, currentY - 2, pageWidth - margin, currentY - 2);
+            if (y > pageH - 15) {
+                doc.addPage();
+                y = 15;
+            }
 
-            // Tabla de items
             doc.setFont('Helvetica', 'normal');
             doc.setFontSize(9);
             doc.setTextColor(0, 0, 0);
+            doc.setDrawColor(220, 220, 220);
+            doc.rect(marg, y, 12, 5);
+            doc.rect(marg + 12, y, w - 27, 5);
+            doc.rect(marg + w - 15, y, 15, 5);
 
-            // Encabezados de columna
+            doc.text(itemId, marg + 1, y + 3.5);
+            const lines = doc.splitTextToSize(itemText, w - 27 - 4);
+            doc.text(lines, marg + 14, y + 3.5);
+
             doc.setFont('Helvetica', 'bold');
-            doc.setFillColor(250, 250, 250);
-            doc.rect(margin, currentY, 15, 6, 'F');
-            doc.rect(margin + 15, currentY, contentWidth - 30, 6, 'F');
-            doc.rect(margin + contentWidth - 15, currentY, 15, 6, 'F');
-
-            doc.text('Ítem', margin + 1, currentY + 4);
-            doc.text('Descripción', margin + 17, currentY + 4);
-            doc.text('Nota', margin + contentWidth - 13, currentY + 4);
-            currentY += 7;
-
-            // Items de la etapa
-            doc.setFont('Helvetica', 'normal');
-            const stageItems = dbItems.filter(i => parseInt(i.stage, 10) === stageNum);
-
-            stageItems.forEach(item => {
-                const scoreRecord = stageScores.find(s => s.itemId === item.id);
-                const score = scoreRecord ? scoreRecord.score : '';
-
-                // Validar si hay espacio en la página
-                if (currentY > pageHeight - 15) {
-                    doc.addPage();
-                    currentY = 15;
-                }
-
-                // Fila de item
-                doc.setDrawColor(220, 220, 220);
-                doc.rect(margin, currentY, 15, 5);
-                doc.rect(margin + 15, currentY, contentWidth - 30, 5);
-                doc.rect(margin + contentWidth - 15, currentY, 15, 5);
-
-                doc.text(String(item.id), margin + 1, currentY + 3.5);
-
-                const descLines = doc.splitTextToSize(item.text, contentWidth - 30 - 4);
-                doc.text(descLines, margin + 17, currentY + 3.5);
-
-                doc.setFont('Helvetica', 'bold');
-                if (score) {
-                    doc.setTextColor(44, 62, 107);
-                    doc.text(String(score), margin + contentWidth - 13, currentY + 3.5);
-                } else {
-                    doc.setTextColor(180, 180, 180);
-                    doc.text('-', margin + contentWidth - 13, currentY + 3.5);
-                }
-                doc.setTextColor(0, 0, 0);
-                doc.setFont('Helvetica', 'normal');
-
-                currentY += 5;
-            });
-
-            // Resumen de etapa
-            const totalScore = stageScores.reduce((sum, r) => sum + (parseInt(r.score) || 0), 0);
-            const countScored = stageScores.filter(r => r.score && r.score > 0).length;
-            const avgScore = countScored > 0 ? Math.round(totalScore / countScored) : 0;
-
-            currentY += 3;
-            doc.setFont('Helvetica', 'bold');
-            doc.setFillColor(220, 230, 240);
-            doc.rect(margin, currentY, contentWidth - 15, 6, 'F');
-            doc.rect(margin + contentWidth - 15, currentY, 15, 6, 'F');
-            doc.text(`PROMEDIO ETAPA ${stageNum}:`, margin + 2, currentY + 4);
-            doc.text(countScored > 0 ? String(avgScore) : '-', margin + contentWidth - 13, currentY + 4);
-
-            currentY += 8;
+            doc.setTextColor(44, 62, 107);
+            doc.text(String(score), marg + w - 13, y + 3.5);
+            y += 5;
         });
 
-        // Guardar PDF
-        const filename = `Calificaciones_${currentUser.rut}_${new Date().getTime()}.pdf`;
+        const filename = `Calificaciones_${currentUser.rut}_${Date.now()}.pdf`;
         doc.save(filename);
 
-        notificationSystem.show('pdf-export', '✅ PDF exportado correctamente', 'success');
-        setTimeout(() => {
-            notificationSystem.remove('pdf-export');
-        }, 2000);
+        notificationSystem.show('pdf-export', '✅ PDF exportado', 'success');
+        setTimeout(() => notificationSystem.remove('pdf-export'), 2000);
 
     } catch (error) {
-        console.error('Error generando PDF:', error);
-        notificationSystem.show('pdf-export', '❌ Error al generar PDF: ' + error.message, 'error');
+        console.error('Error PDF:', error);
+        notificationSystem.show('pdf-export', '❌ Error: ' + error.message, 'error');
     }
 }
 
