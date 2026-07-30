@@ -6903,7 +6903,7 @@ function continuarExportPDFWithData(freshScores) {
     showProgressBar('Generando PDF...');
 
     try {
-        const doc = new jsPDF({
+        const doc = new window.jspdf.jsPDF({
             orientation: 'portrait',
             unit: 'mm',
             format: 'letter'
