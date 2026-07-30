@@ -13,14 +13,20 @@ const SPREADSHEET_ID = '1apPfP7Y3ancW166QGEvh07kESYjuV8sP-Wd14cnQjjo';
  */
 function doGet(e) {
   const action = e.parameter.action || 'getScores';
+  let response;
 
   if (action === 'getScores') {
-    return getScoresData();
+    response = getScoresData();
   } else if (action === 'getSummary') {
-    return getSummaryData();
+    response = getSummaryData();
   } else {
-    return createResponse({ error: 'Action no reconocida' }, 400);
+    response = createResponse({ error: 'Action no reconocida' }, 400);
   }
+
+  // Agregar headers CORS
+  return response.setHeader('Access-Control-Allow-Origin', '*')
+    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
 /**
