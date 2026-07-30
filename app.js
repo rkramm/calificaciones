@@ -6877,48 +6877,27 @@ function applyConflictResolution(added, removed, modified, remoteData) {
     };
 }
 
-/* ================= EXPORTACIÓN A PDF DEL EVALUADOR ================= */
+/* ================= EXPORTACIÓN A EXCEL ================= */
 function exportEvaluatorPDF() {
     try {
-        const doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
-        const pageW = doc.internal.pageSize.getWidth();
-        const pageH = doc.internal.pageSize.getHeight();
-        let y = 15;
-        const marg = 10;
-        const w = pageW - 2 * marg;
-
-        // Encabezado
-        doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.text('REPORTE DE CALIFICACIONES', marg, y);
-        y += 8;
-
-        doc.setFontSize(10);
-        doc.setFont('Helvetica', 'normal');
-        doc.text(`Evaluador: ${currentUser.nombre} (${currentUser.rut})`, marg, y);
-        y += 5;
-
-        const coverageText = document.querySelector('[id*="coverage"]')?.textContent || 'N/A';
-        const entityText = document.querySelector('[id*="entity"]')?.textContent || window.currentSelectedEntity || 'N/A';
-
-        doc.text(`Cobertura: ${coverageText}`, marg, y);
-        y += 5;
-        doc.text(`Entidad: ${entityText}`, marg, y);
-        y += 5;
-        doc.text(`Fecha: ${new Date().toLocaleDateString('es-CL')}`, marg, y);
-
-        y += 8;
-        doc.setDrawColor(44, 62, 107);
-        doc.line(marg, y, pageW - marg, y);
-        y += 5;
-
-        // Leer items y scores de allMemoryScores
         if (!allMemoryScores || allMemoryScores.length === 0) {
-            notificationSystem.show('pdf-export', '❌ No hay datos guardados para exportar', 'error');
+            notificationSystem.show('export', '❌ No hay datos para exportar', 'error');
             return;
         }
 
-        // Obtener items únicos de dbItems
+        const coverageText = document.querySelector('[id*="coverage"]')?.textContent || 'N/A';
+        const entityText = window.currentSelectedEntity || 'N/A';
+
+        const data = [];
+        data.push(['REPORTE DE CALIFICACIONES']);
+        data.push(['']);
+        data.push(['Evaluador:', currentUser.nombre + ' (' + currentUser.rut + ')']);
+        data.push(['Cobertura:', coverageText]);
+        data.push(['Entidad:', entityText]);
+        data.push(['Fecha:', new Date().toLocaleDateString('es-CL')]);
+        data.push(['']);
+        data.push(['Etapa', 'Item', 'Descripción', 'Calificación']);
+
         const itemsByStage = {};
         dbItems.forEach(item => {
             const stage = parseInt(item.stage, 10);
@@ -6926,70 +6905,37 @@ function exportEvaluatorPDF() {
             itemsByStage[stage].push(item);
         });
 
-        // Procesar cada etapa
         const stages = Object.keys(itemsByStage).map(Number).sort((a, b) => a - b);
-        let stageColor = 0;
-        const colors = ['#E8F4F8', '#F0F8E8'];
 
         stages.forEach(stage => {
-            const bgColor = colors[stageColor % 2];
-            stageColor++;
-
-            doc.setFillColor(parseInt(bgColor.slice(1, 3), 16), parseInt(bgColor.slice(3, 5), 16), parseInt(bgColor.slice(5, 7), 16));
-            doc.rect(marg, y, w, 10, 'F');
-            doc.setFont('Helvetica', 'bold');
-            doc.setFontSize(11);
-            doc.setTextColor(44, 62, 107);
-            doc.text(`ETAPA ${stage}`, marg + 2, y + 4);
-            y += 5;
-
-            doc.setFont('Helvetica', 'normal');
-            doc.setFontSize(8);
-            doc.text(`Cobertura: ${coverageText} | Entidad: ${entityText}`, marg + 2, y + 3);
-            y += 5;
-
-            doc.setDrawColor(200, 200, 200);
-            doc.line(marg, y - 1, pageW - marg, y - 1);
-
             itemsByStage[stage].forEach(item => {
-                if (y > pageH - 15) {
-                    doc.addPage();
-                    y = 15;
-                }
-
                 const scoreRecord = allMemoryScores.find(s => s.itemId === item.id && s.stage === stage);
-                const score = scoreRecord && scoreRecord.score ? String(scoreRecord.score) : '-';
+                const score = scoreRecord && scoreRecord.score ? scoreRecord.score : '';
 
-                doc.setFont('Helvetica', 'normal');
-                doc.setFontSize(9);
-                doc.setTextColor(0, 0, 0);
-                doc.setDrawColor(220, 220, 220);
-                doc.rect(marg, y, 12, 5);
-                doc.rect(marg + 12, y, w - 27, 5);
-                doc.rect(marg + w - 15, y, 15, 5);
-
-                doc.text(item.id, marg + 1, y + 3.5);
-                const lines = doc.splitTextToSize(item.text, w - 27 - 4);
-                doc.text(lines, marg + 14, y + 3.5);
-
-                doc.setFont('Helvetica', 'bold');
-                doc.setTextColor(44, 62, 107);
-                doc.text(score, marg + w - 13, y + 3.5);
-                y += 5;
+                data.push([stage, item.id, item.text, score]);
             });
-
-            y += 3;
         });
 
-        const filename = `Calificaciones_${currentUser.rut}_${Date.now()}.pdf`;
-        doc.save(filename);
+        const worksheet = window.XLSX.utils.aoa_to_sheet(data);
+        worksheet['!cols'] = [
+            { wch: 8 },
+            { wch: 8 },
+            { wch: 50 },
+            { wch: 12 }
+        ];
 
-        notificationSystem.show('pdf-export', '✅ PDF exportado', 'success');
-        setTimeout(() => notificationSystem.remove('pdf-export'), 2000);
+        const workbook = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(workbook, worksheet, 'Calificaciones');
+
+        const filename = `Calificaciones_${currentUser.rut}_${Date.now()}.xlsx`;
+        window.XLSX.writeFile(workbook, filename);
+
+        notificationSystem.show('export', '✅ Excel exportado correctamente', 'success');
+        setTimeout(() => notificationSystem.remove('export'), 2000);
 
     } catch (error) {
-        console.error('Error PDF:', error);
-        notificationSystem.show('pdf-export', '❌ Error: ' + error.message, 'error');
+        console.error('Error exportación:', error);
+        notificationSystem.show('export', '❌ Error: ' + error.message, 'error');
     }
 }
 
