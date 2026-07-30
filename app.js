@@ -6900,199 +6900,174 @@ function exportEvaluatorPDF() {
 }
 
 function continuarExportPDFWithData(freshScores) {
-    const exportDate = formatDateTime(new Date());
-    const printContainer = document.createElement('div');
-    printContainer.id = 'pdf-print-container';
-
-    let contentHtml = `
-        <div style="text-align: center; margin-bottom: 10px; font-weight: bold; font-size: 0.9rem;">
-            RESPALDO DE PRECALIFICACIONES POR ETAPA
-        </div>
-    `;
-
-    // Agrupar asignaciones por entidad - SOLO las del usuario actual
-    const entidadesMap = {};
-    const userAsignaciones = allAsignacionesMapped.filter(a => a.rut === currentUser.rut);
-    userAsignaciones.forEach(asig => {
-        const entidad = asig.entidadNombre || "Sin especificar";
-        if (!entidadesMap[entidad]) {
-            entidadesMap[entidad] = [];
-        }
-        entidadesMap[entidad].push(asig);
-    });
-
-    // DEBUG: Mostrar qué entidades se están procesando
-    console.log('🔍 continuarExportPDFWithData - Entidades a procesar:', Object.keys(entidadesMap));
-    console.log('📊 freshScores total:', freshScores.length);
-    console.log('📋 Entidades únicas en freshScores:', [...new Set(freshScores.map(r => r.entidad))]);
-
-    // Procesar cada entidad
-    Object.keys(entidadesMap).forEach((nombreEntidad, entidadIdx) => {
-        const entidadAsignaciones = entidadesMap[nombreEntidad];
-        console.log(`\n🏢 Procesando ENTIDAD: "${nombreEntidad}"`);
-        console.log(`   Asignaciones: ${entidadAsignaciones.length}`);
-
-        // Encabezado de entidad separado y destacado
-        contentHtml += `
-            <div style="page-break-inside: avoid; margin-top: 20px; margin-bottom: 10px; padding: 10px; background: linear-gradient(135deg, #25306B 0%, #006BB9 100%); color: white; border-radius: 4px; border-left: 8px solid #FFC107;">
-                <div style="font-size: 1rem; font-weight: bold; margin-bottom: 4px;">🏢 ENTIDAD: ${nombreEntidad}</div>
-                <div style="font-size: 0.8rem;">Evaluador: ${currentUser.nombre} | Fecha: ${exportDate}</div>
-            </div>
-        `;
-
-        // Procesar todas las etapas de esta entidad
-        entidadAsignaciones.forEach(asig => {
-            // FIX: asig.etapas es STRING ("1|2|3"), no array - parsear correctamente
-            const etapasArray = typeof asig.etapas === 'string' ? asig.etapas.split('|').map(e => parseInt(e, 10)) : asig.etapas;
-            etapasArray.forEach(stg => {
-            // CRÍTICO: Filtrar por datos FRESCOS de Google Sheets, no de allMemoryScores cacheado
-            const stageRecords = freshScores.filter(r =>
-                r.rutEvaluador === currentUser.rut &&
-                r.cobertura === asig.cobertura &&
-                r.stage === parseInt(stg, 10) &&
-                r.entidad === nombreEntidad
-            );
-
-            if (stg === 4) {
-                console.log(`   ETAPA ${stg} - Buscando: rut=${currentUser.rut}, cobertura=${asig.cobertura}, entidad="${nombreEntidad}"`);
-                console.log(`   Encontrados: ${stageRecords.length} registros`);
-                if (stageRecords.length === 0) {
-                    console.log(`   ⚠️ Sin resultados. Verificando qué hay en freshScores para esta cobertura/etapa:`);
-                    const debugRecords = freshScores.filter(r =>
-                        r.rutEvaluador === currentUser.rut &&
-                        r.cobertura === asig.cobertura &&
-                        r.stage === parseInt(stg, 10)
-                    );
-                    debugRecords.forEach(r => console.log(`       - entidad="${r.entidad}"`));
-                }
-            }
-            let lastEvalDate = "Sin registro";
-            let maxTs = 0;
-            stageRecords.forEach(r => {
-                let ts = parseAnyDate(r.hora);
-                if (ts > maxTs) { maxTs = ts; lastEvalDate = r.hora; }
-                else if (lastEvalDate === "Sin registro" && r.hora) lastEvalDate = r.hora;
-            });
-
-            const meta = STAGES_METADATA[stg] || { title: `ETAPA ${stg}`, desc: "" };
-            const stageItems = dbItems.filter(i => parseInt(i.stage, 10) === parseInt(stg, 10));
-            let totalScore = 0, countScore = 0;
-
-            const rowsHtml = stageItems.map((item, idx) => {
-                const rec = stageRecords.find(r => r.itemId === item.id);
-                const val = rec && rec.score !== undefined ? rec.score : "-";
-                if (val !== "-") { totalScore += parseInt(val, 10); countScore++; }
-
-                let cellColor = "#FFF";
-                if (val !== "-") {
-                    if (val >= 80) cellColor = "#D4EDDA"; // Verde BUENO
-                    else if (val >= 50) cellColor = "#FFF3CD"; // Amarillo ACEPTABLE
-                    else cellColor = "#F8D7DA"; // Rojo MALO
-                }
-
-                return `
-                    <tr>
-                        <td style="padding: 4px; border: 1px solid #000; width: 5%; text-align: center; font-size: 0.75rem; font-weight: bold;">${item.id}</td>
-                        <td style="padding: 4px; border: 1px solid #000; width: 85%; font-size: 0.75rem;">${item.text}</td>
-                        <td style="padding: 4px; border: 1px solid #000; width: 10%; text-align: center; font-weight: bold; background-color: ${cellColor}; font-size: 0.75rem;">${val}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            const finalAvg = countScore > 0 ? Math.round(totalScore / countScore) : 0;
-            const status = getStatusInfo(finalAvg);
-            const statusText = countScore > 0 ? status.text : "---";
-            let headerBgColor = "#D4EDDA";
-            if (statusText === "ACEPTABLE") headerBgColor = "#FFF3CD";
-            else if (statusText === "MALO") headerBgColor = "#F8D7DA";
-
-            const [programa, provincia] = asig.cobertura.split(' - ');
-            const entidad = asig.entidadNombre || "No especificada";
-
-            contentHtml += `
-                <table style="width: 100%; margin-bottom: 15px; border-collapse: collapse; page-break-inside: avoid; font-size: 0.75rem;">
-                    <thead>
-                        <tr style="background-color: #25306B; color: white;">
-                            <th colspan="3" style="padding: 6px; border: 1px solid #000; text-align: left; font-weight: bold;">
-                                ETAPA ${stg}. ${meta.title}
-                            </th>
-                        </tr>
-                        <tr style="background-color: #F0F0F0;">
-                            <td style="padding: 4px; border: 1px solid #000; width: 25%;"><strong>Entidad:</strong> ${entidad}</td>
-                            <td style="padding: 4px; border: 1px solid #000; width: 35%;"><strong>Programa:</strong> ${programa || "Sin asignar"}</td>
-                            <td style="padding: 4px; border: 1px solid #000; width: 40%;"><strong>Provincia:</strong> ${provincia || "Sin asignar"}</td>
-                        </tr>
-                        <tr style="background-color: #F5F7FA;">
-                            <th style="padding: 4px; border: 1px solid #000; width: 5%; text-align: center;">Ítem</th>
-                            <th style="padding: 4px; border: 1px solid #000; width: 85%; text-align: left;">Criterio de Evaluación</th>
-                            <th style="padding: 4px; border: 1px solid #000; width: 10%; text-align: center;">Nota</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rowsHtml}
-                    </tbody>
-                    <tfoot>
-                        <tr style="background-color: ${headerBgColor}; font-weight: bold;">
-                            <td colspan="2" style="padding: 6px; border: 1px solid #000; text-align: right;">PRECALIFICACIÓN ETAPA ${stg}:</td>
-                            <td style="padding: 6px; border: 1px solid #000; text-align: center;">${countScore > 0 ? finalAvg : '-'}</td>
-                        </tr>
-                        <tr style="background-color: ${headerBgColor}; font-weight: bold;">
-                            <td colspan="3" style="padding: 6px; border: 1px solid #000; text-align: center;">ESTADO: ${statusText}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            `;
-            });
-        });
-    });
-
-    printContainer.innerHTML = contentHtml;
-    document.body.appendChild(printContainer);
-
-    // Configurar opciones de html2pdf
-    const opt = {
-        margin: [0.5, 0.5, 0.5, 0.5],
-        filename: `Respaldo_Precalificaciones_${currentUser.rut}_${new Date().getTime()}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { format: 'letter', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-
-    // Mostrar barra de progreso
     showProgressBar('Generando PDF...');
 
-    // Generar PDF con progreso
-    html2pdf()
-        .set(opt)
-        .from(printContainer)
-        .save()
-        .then(() => {
-            // Remover contenedor temporal
-            if (printContainer.parentNode) {
-                printContainer.parentNode.removeChild(printContainer);
-            }
-
-            // Ocultar progreso
-            hideProgressBar();
-            notificationSystem.show('pdf-export', '✅ PDF exportado correctamente', 'success');
-
-            // Auto-ocultar mensaje después de 2 segundos
-            setTimeout(() => {
-                notificationSystem.remove('pdf-export');
-            }, 2000);
-        })
-        .catch(error => {
-            console.error('Error al generar PDF:', error);
-            hideProgressBar();
-            notificationSystem.show('pdf-export', '❌ Error al generar PDF', 'error');
-
-            if (printContainer.parentNode) {
-                printContainer.parentNode.removeChild(printContainer);
-            }
+    try {
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'letter'
         });
 
-    document.body.removeChild(printContainer);
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        let currentY = 15;
+        const margin = 10;
+        const contentWidth = pageWidth - 2 * margin;
+
+        // Encabezado
+        doc.setFont('Helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('REPORTE DE CALIFICACIONES', margin, currentY);
+
+        currentY += 8;
+        doc.setFontSize(10);
+        doc.setFont('Helvetica', 'normal');
+        doc.text(`Evaluador: ${currentUser.nombre} (${currentUser.rut})`, margin, currentY);
+        currentY += 5;
+        doc.text(`Cobertura: ${currentSelectedCoverage}`, margin, currentY);
+        currentY += 5;
+        doc.text(`Entidad: ${window.currentSelectedEntity || 'No seleccionada'}`, margin, currentY);
+        currentY += 5;
+        doc.text(`Fecha: ${formatDateTime(new Date())}`, margin, currentY);
+
+        // Línea divisoria
+        currentY += 8;
+        doc.setDrawColor(44, 62, 107);
+        doc.line(margin, currentY, pageWidth - margin, currentY);
+        currentY += 5;
+
+        // Obtener etapas relevantes del usuario actual
+        const userAsignaciones = allAsignacionesMapped.filter(a => a.rut === currentUser.rut && a.cobertura === currentSelectedCoverage);
+        const etapasSet = new Set();
+        userAsignaciones.forEach(asig => {
+            const etapasArray = typeof asig.etapas === 'string' ? asig.etapas.split('|').map(e => parseInt(e, 10)) : asig.etapas;
+            etapasArray.forEach(e => etapasSet.add(e));
+        });
+        const etapas = Array.from(etapasSet).sort((a, b) => a - b);
+
+        // Colores alternados por etapa
+        const stageColors = ['#E8F4F8', '#F0F8E8'];
+        let stageColorIdx = 0;
+
+        // Procesar cada etapa
+        etapas.forEach(stageNum => {
+            const stageMeta = STAGES_METADATA[stageNum] || { title: `ETAPA ${stageNum}`, desc: '' };
+
+            // Filtrar scores para esta etapa y entidad
+            const stageScores = freshScores.filter(r =>
+                r.rutEvaluador === currentUser.rut &&
+                r.cobertura === currentSelectedCoverage &&
+                r.stage === stageNum &&
+                r.entidad === window.currentSelectedEntity
+            );
+
+            if (stageScores.length === 0) return; // Saltar si no hay datos
+
+            // Encabezado de etapa con color de fondo
+            const stageColor = stageColors[stageColorIdx % 2];
+            stageColorIdx++;
+
+            doc.setFillColor(parseInt(stageColor.slice(1, 3), 16), parseInt(stageColor.slice(3, 5), 16), parseInt(stageColor.slice(5, 7), 16));
+            doc.rect(margin, currentY, contentWidth, 8, 'F');
+
+            doc.setFont('Helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(44, 62, 107);
+            doc.text(`ETAPA ${stageNum} - ${stageMeta.title}`, margin + 2, currentY + 5.5);
+            currentY += 10;
+
+            // Línea divisoria ligera
+            doc.setDrawColor(200, 200, 200);
+            doc.line(margin, currentY - 2, pageWidth - margin, currentY - 2);
+
+            // Tabla de items
+            doc.setFont('Helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+
+            // Encabezados de columna
+            doc.setFont('Helvetica', 'bold');
+            doc.setFillColor(250, 250, 250);
+            doc.rect(margin, currentY, 15, 6, 'F');
+            doc.rect(margin + 15, currentY, contentWidth - 30, 6, 'F');
+            doc.rect(margin + contentWidth - 15, currentY, 15, 6, 'F');
+
+            doc.text('Ítem', margin + 1, currentY + 4);
+            doc.text('Descripción', margin + 17, currentY + 4);
+            doc.text('Nota', margin + contentWidth - 13, currentY + 4);
+            currentY += 7;
+
+            // Items de la etapa
+            doc.setFont('Helvetica', 'normal');
+            const stageItems = dbItems.filter(i => parseInt(i.stage, 10) === stageNum);
+
+            stageItems.forEach(item => {
+                const scoreRecord = stageScores.find(s => s.itemId === item.id);
+                const score = scoreRecord ? scoreRecord.score : '';
+
+                // Validar si hay espacio en la página
+                if (currentY > pageHeight - 15) {
+                    doc.addPage();
+                    currentY = 15;
+                }
+
+                // Fila de item
+                doc.setDrawColor(220, 220, 220);
+                doc.rect(margin, currentY, 15, 5);
+                doc.rect(margin + 15, currentY, contentWidth - 30, 5);
+                doc.rect(margin + contentWidth - 15, currentY, 15, 5);
+
+                doc.text(String(item.id), margin + 1, currentY + 3.5);
+
+                const descLines = doc.splitTextToSize(item.text, contentWidth - 30 - 4);
+                doc.text(descLines, margin + 17, currentY + 3.5);
+
+                doc.setFont('Helvetica', 'bold');
+                if (score) {
+                    doc.setTextColor(44, 62, 107);
+                    doc.text(String(score), margin + contentWidth - 13, currentY + 3.5);
+                } else {
+                    doc.setTextColor(180, 180, 180);
+                    doc.text('-', margin + contentWidth - 13, currentY + 3.5);
+                }
+                doc.setTextColor(0, 0, 0);
+                doc.setFont('Helvetica', 'normal');
+
+                currentY += 5;
+            });
+
+            // Resumen de etapa
+            const totalScore = stageScores.reduce((sum, r) => sum + (parseInt(r.score) || 0), 0);
+            const countScored = stageScores.filter(r => r.score && r.score > 0).length;
+            const avgScore = countScored > 0 ? Math.round(totalScore / countScored) : 0;
+
+            currentY += 3;
+            doc.setFont('Helvetica', 'bold');
+            doc.setFillColor(220, 230, 240);
+            doc.rect(margin, currentY, contentWidth - 15, 6, 'F');
+            doc.rect(margin + contentWidth - 15, currentY, 15, 6, 'F');
+            doc.text(`PROMEDIO ETAPA ${stageNum}:`, margin + 2, currentY + 4);
+            doc.text(countScored > 0 ? String(avgScore) : '-', margin + contentWidth - 13, currentY + 4);
+
+            currentY += 8;
+        });
+
+        // Guardar PDF
+        const filename = `Calificaciones_${currentUser.rut}_${new Date().getTime()}.pdf`;
+        doc.save(filename);
+
+        hideProgressBar();
+        notificationSystem.show('pdf-export', '✅ PDF exportado correctamente', 'success');
+        setTimeout(() => {
+            notificationSystem.remove('pdf-export');
+        }, 2000);
+
+    } catch (error) {
+        console.error('Error generando PDF:', error);
+        hideProgressBar();
+        notificationSystem.show('pdf-export', '❌ Error al generar PDF', 'error');
+    }
 }
 
 /* ================= CONSULTAR SESIONES ACTIVAS ================= */
