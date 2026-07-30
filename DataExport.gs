@@ -3,9 +3,10 @@
  * Script dedicado SOLO a la exportación de datos para análisis y dashboard
  * NO modifica datos, SOLO lectura
  * Puede deployarse independientemente sin afectar el sistema de calificaciones
- *
- * Nota: Usa SPREADSHEET_ID definido en Code.gs (no duplicar)
  */
+
+// Sheet separada para pruebas y resúmenes (más segura que la original)
+const DASHBOARD_SPREADSHEET_ID = '1sJsZgcW8KrT4hAhZ0SDKO6Q5N_8nkG8UWO2eP_t0ZZQ';
 
 /**
  * Endpoint público: Devuelve datos de 'scores' para dashboard
@@ -34,7 +35,7 @@ function doGet(e) {
  */
 function getScoresData() {
   try {
-    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const spreadsheet = SpreadsheetApp.openById(DASHBOARD_SPREADSHEET_ID);
     const scoresSheet = spreadsheet.getSheetByName('scores');
 
     if (!scoresSheet) {
@@ -79,7 +80,7 @@ function getScoresData() {
  */
 function getSummaryData() {
   try {
-    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const spreadsheet = SpreadsheetApp.openById(DASHBOARD_SPREADSHEET_ID);
     const scoresSheet = spreadsheet.getSheetByName('scores');
 
     if (!scoresSheet) {
