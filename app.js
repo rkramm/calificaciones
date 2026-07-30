@@ -6916,7 +6916,13 @@ function exportEvaluatorPDF() {
             });
         });
 
-        const worksheet = window.XLSX.utils.aoa_to_sheet(data);
+        const XLSX = window.XLSX || window.xlsx;
+        if (!XLSX) {
+            notificationSystem.show('export', '❌ Error: Librería XLSX no disponible', 'error');
+            return;
+        }
+
+        const worksheet = XLSX.utils.aoa_to_sheet(data);
         worksheet['!cols'] = [
             { wch: 8 },
             { wch: 8 },
@@ -6924,11 +6930,11 @@ function exportEvaluatorPDF() {
             { wch: 12 }
         ];
 
-        const workbook = window.XLSX.utils.book_new();
-        window.XLSX.utils.book_append_sheet(workbook, worksheet, 'Calificaciones');
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Calificaciones');
 
         const filename = `Calificaciones_${currentUser.rut}_${Date.now()}.xlsx`;
-        window.XLSX.writeFile(workbook, filename);
+        XLSX.writeFile(workbook, filename);
 
         notificationSystem.show('export', '✅ Excel exportado correctamente', 'success');
         setTimeout(() => notificationSystem.remove('export'), 2000);
