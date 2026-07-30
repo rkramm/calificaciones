@@ -228,7 +228,7 @@ const SESSION_DURATION_MS = 10 * 60 * 1000; // 10 minutos
 // Control de sesiones simultáneas (máximo 6 usuarios)
 const MAX_CONCURRENT_USERS = 6;
 const ACTIVE_USER_SESSIONS = new Map(); // RUT → {loginTime, lastActivity, lastWrite}
-const SESSION_TIMEOUT_MINUTES = 10;
+const SESSION_TIMEOUT_MINUTES = 15;
 const INACTIVITY_TIMEOUT_MS = SESSION_TIMEOUT_MINUTES * 60 * 1000;
 
 // Rastrear timeouts de inactividad por usuario
