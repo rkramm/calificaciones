@@ -572,6 +572,30 @@ function doPost(e) {
           }
         });
       }
+
+      // Eliminar filas específicas por clave exacta (borrado explícito del usuario).
+      // SOLO elimina filas cuya clave primaria coincide EXACTAMENTE con lo recibido en
+      // payload.deleteKeys - nunca borra nada más. Antes de esto, el modo incremental
+      // nunca eliminaba filas (solo agregaba/actualizaba), por lo que borrar una nota
+      // en la app no se propagaba a Google Sheets.
+      const deleteKeys = Array.isArray(payload.deleteKeys) ? payload.deleteKeys.map(String) : [];
+      if (deleteKeys.length > 0) {
+        const deleteKeySet = new Set(deleteKeys);
+        const valuesForDelete = sheet.getDataRange().getDisplayValues();
+        const keyIndexForDelete = valuesForDelete.length > 0 ? valuesForDelete[0].indexOf(keyField) : -1;
+        if (keyIndexForDelete >= 0) {
+          const rowsToDelete = [];
+          for (let i = 1; i < valuesForDelete.length; i++) {
+            const key = valuesForDelete[i][keyIndexForDelete];
+            if (key !== undefined && key !== '' && deleteKeySet.has(String(key))) {
+              rowsToDelete.push(i + 1); // fila real en la hoja (1-indexada, +1 por el header)
+            }
+          }
+          // Borrar de abajo hacia arriba para no invalidar los índices de las filas restantes
+          rowsToDelete.sort((a, b) => b - a);
+          rowsToDelete.forEach(rowNumber => sheet.deleteRow(rowNumber));
+        }
+      }
     }
 
     // Incrementar versión del servidor tras escritura exitosa (reutiliza versionData ya leído)

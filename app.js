@@ -1102,6 +1102,9 @@ async function cloudSave(table, dataArray, mode = 'incremental', options = {}) {
             if (options.forceVersion) {
                 body.forceVersion = true;
             }
+            if (options.deleteKeys && options.deleteKeys.length > 0) {
+                body.deleteKeys = options.deleteKeys;
+            }
 
             const response = await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
@@ -5766,16 +5769,18 @@ function saveEvaluatorScores(callback, options = {}) {
             // 3a. Ítems que el evaluador borró explícitamente en esta sesión (tombstones:
             // score=0, modificado=true en allMemoryScores). Estos NO deben preservarse:
             // deben desaparecer de Google Sheets, no quedar con su valor anterior.
-            const deletedKeys = new Set(
-                allMemoryScores
-                    .filter(r =>
-                        r.rutEvaluador === currentUser.rut &&
-                        r.cobertura === currentCoverage &&
-                        r.score === 0 &&
-                        r.modificado === true
-                    )
-                    .map(r => normalizeKey(r.entidad, r.stage, r.itemId))
+            const tombstoneRecords = allMemoryScores.filter(r =>
+                r.rutEvaluador === currentUser.rut &&
+                r.cobertura === currentCoverage &&
+                r.score === 0 &&
+                r.modificado === true
             );
+            const deletedKeys = new Set(tombstoneRecords.map(r => normalizeKey(r.entidad, r.stage, r.itemId)));
+            // Claves reales (idTx) a eliminar FÍSICAMENTE de Google Sheets. El modo
+            // incremental del backend solo agrega/actualiza por clave primaria - nunca
+            // borra filas que no vienen en el envío. Por eso hay que pedirle explícitamente
+            // que elimine estas filas exactas (ver Code.gs, payload.deleteKeys).
+            const deleteKeysForBackend = tombstoneRecords.map(r => r.idTx).filter(Boolean);
             if (deletedKeys.size > 0) {
                 console.log('🗑️ Ítems borrados explícitamente esta sesión (se eliminarán de Sheets):', Array.from(deletedKeys));
             }
@@ -5811,8 +5816,9 @@ function saveEvaluatorScores(callback, options = {}) {
             console.log('DS27 en finalScores QUE SE GUARDARA:', ds27InFinal);
             console.log('finalScores TOTAL:', finalScores.length);
 
-            // Guardar todo en Google Sheets (modo incremental: actualiza sin borrar otros registros)
-            cloudSave('scores', finalScores, 'incremental').then((success) => {
+            // Guardar todo en Google Sheets (modo incremental: actualiza sin borrar otros registros,
+            // salvo las filas exactas indicadas en deleteKeys, que corresponden a notas borradas por el usuario)
+            cloudSave('scores', finalScores, 'incremental', { deleteKeys: deleteKeysForBackend }).then((success) => {
                 console.log('cloudSave completado. Success:', success);
                 hasUnsavedEvaluatorChanges = false;
 
