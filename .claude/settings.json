@@ -4,7 +4,10 @@
       "Bash(cd \"C:\\\\Users\\\\rkramm\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-rkramm-OneDrive---Ministerio-de-Vivienda-y-Urbanismo-Proyectos-Calificaciones-EP-2026-V1\\\\08557c6c-fbaa-440d-aa6d-ea1389f7a75d\\\\scratchpad\" && \\\\ *)",
       "Bash(sed 's/var reduceMotion = window.matchMedia && window.matchMedia\\('\\\\''\\(prefers-reduced-motion: reduce\\)'\\\\''\\).matches;/var reduceMotion = true;/' 'C:\\\\Users\\\\rkramm\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-rkramm-OneDrive---Ministerio-de-Vivienda-y-Urbanismo-Proyectos-Calificaciones-EP-2026-V1\\\\08557c6c-fbaa-440d-aa6d-ea1389f7a75d\\\\scratchpad\\\\presentacion-evaluadores.html')",
       "Bash(echo \"<script>window.addEventListener\\('load', function\\(\\){ setTimeout\\(function\\(\\){ document.getElementById\\('dots'\\).children[1].click\\(\\); }, 100\\); }\\);</script>\")",
-      "Bash(echo \"<style>*{transition:none !important;animation:none !important;}</style>\")"
+      "Bash(echo \"<style>*{transition:none !important;animation:none !important;}</style>\")",
+      "Bash(curl -i -X OPTIONS \"https://script.google.com/macros/s/AKfycbyW6vQBgyJ5adIFNvqactwjwE3sFV_YJjUIHRcgakXI4AuOzVcQlSZ2G4fmTKL3SYH0Dg/exec\")",
+      "Bash(curl -i -X OPTIONS \"https://script.google.com/macros/s/AKfycbwBbobYVMG5zUfMiBugxgfkcYxrkm7hYgNHhfvaWA4oo5hU4R7ov9o-Gqei-CYLpi9yCw/exec\")",
+      "Bash(git rm *)"
     ]
   }
 }

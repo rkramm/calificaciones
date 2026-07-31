@@ -2,16 +2,24 @@ const SPREADSHEET_ID = '1apPfP7Y3ancW166QGEvh07kESYjuV8sP-Wd14cnQjjo';
 const VERSION_SHEET_NAME = '__version__';
 
 // Control de sesiones concurrentes
-const MAX_CONCURRENT_USERS = 6;
+const MAX_CONCURRENT_USERS = 10;
 const PROPERTIES = PropertiesService.getScriptProperties();
 
 // Manejar CORS preflight requests (Chrome y navegadores modernos)
 function doOptions(e) {
   return ContentService.createTextOutput('')
-    .setHeader('Access-Control-Allow-Origin', '*')
-    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    .addHeader('Access-Control-Allow-Origin', '*')
+    .addHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .addHeader('Access-Control-Allow-Headers', 'Content-Type')
     .setMimeType(ContentService.MimeType.TEXT);
+}
+
+// Helper para agregar headers CORS a cualquier response
+function addCorsHeaders(output) {
+  return output
+    .addHeader('Access-Control-Allow-Origin', '*')
+    .addHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .addHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
 /**
@@ -73,33 +81,11 @@ function doPost(e) {
     const action = payload.action;
     const userRut = payload.userRut;
 
-    // Manejar login
+    // Manejar login (sin límite de usuarios concurrentes)
     if (action === 'login') {
-      // Leer sesiones activas desde PropertiesService
-      const sessionsJson = PROPERTIES.getProperty('ACTIVE_SESSIONS') || '{}';
-      const ACTIVE_SESSIONS = JSON.parse(sessionsJson);
-      const activeSessions = Object.keys(ACTIVE_SESSIONS).length;
-
-      if (activeSessions >= MAX_CONCURRENT_USERS) {
-        return ContentService.createTextOutput(JSON.stringify({
-          success: false,
-          error: `Sistema saturado (${activeSessions}/${MAX_CONCURRENT_USERS} usuarios). Intente en 5 minutos.`
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-
-      // Registrar sesión con nombre del usuario
-      ACTIVE_SESSIONS[userRut] = {
-        loginTime: new Date().getTime(),
-        lastActivity: new Date().getTime(),
-        nombre: payload.userName || userRut  // Guardar nombre si viene en payload
-      };
-
-      // Guardar sesiones actualizadas
-      PROPERTIES.setProperty('ACTIVE_SESSIONS', JSON.stringify(ACTIVE_SESSIONS));
-
       return ContentService.createTextOutput(JSON.stringify({
         success: true,
-        message: `Login exitoso. ${activeSessions + 1}/${MAX_CONCURRENT_USERS} usuarios conectados.`
+        message: `Login exitoso`
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -554,7 +540,6 @@ function normalizeEntidad(str) {
  */
 function doGet(e) {
   try {
-    // Permitir CORS para cualquier origen
     const output = {};
     const action = e.parameter.action;
 
@@ -574,26 +559,26 @@ function doGet(e) {
       } else if (programa === 'DS10') {
         sheetName = '10_py';
       } else {
-        return ContentService.createTextOutput(JSON.stringify({
+        return addCorsHeaders(ContentService.createTextOutput(JSON.stringify({
           data: [],
           debug: 'Programa no reconocido: ' + rawPrograma + '. Se esperaba DS49, DS27 o DS10.'
-        })).setMimeType(ContentService.MimeType.JSON);
+        }))).setMimeType(ContentService.MimeType.JSON);
       }
 
       const sheet = spreadsheet.getSheetByName(sheetName);
       if (!sheet) {
-        return ContentService.createTextOutput(JSON.stringify({
+        return addCorsHeaders(ContentService.createTextOutput(JSON.stringify({
           data: [],
           debug: 'No existe la pestaña ' + sheetName + ' para el programa ' + programa
-        })).setMimeType(ContentService.MimeType.JSON);
+        }))).setMimeType(ContentService.MimeType.JSON);
       }
 
       const values = sheet.getDataRange().getDisplayValues();
       if (values.length <= 1) {
-        return ContentService.createTextOutput(JSON.stringify({
+        return addCorsHeaders(ContentService.createTextOutput(JSON.stringify({
           data: [],
           debug: 'La pestaña ' + sheetName + ' esta vacia o solo tiene encabezados'
-        })).setMimeType(ContentService.MimeType.JSON);
+        }))).setMimeType(ContentService.MimeType.JSON);
       }
 
       const headers = values[0];
@@ -650,10 +635,10 @@ function doGet(e) {
         data.push(obj);
       }
 
-      return ContentService.createTextOutput(JSON.stringify({
+      return addCorsHeaders(ContentService.createTextOutput(JSON.stringify({
         data: data,
         debug: 'Programa: ' + programa + ', Pestaña: ' + sheetName + ', Filas evaluadas: ' + filasEvaluadas + ', Coincidencias: ' + coincidencias + ', Entidad buscada: ' + entidad + ', Columna entidad: ' + entidadColIndex
-      })).setMimeType(ContentService.MimeType.JSON);
+      }))).setMimeType(ContentService.MimeType.JSON);
     }
 
     // Comportamiento por defecto: leer tabla genérica (con filtro opcional por provincia)
@@ -663,12 +648,12 @@ function doGet(e) {
     const sheet = spreadsheet.getSheetByName(tableName);
 
     if (!sheet) {
-      return ContentService.createTextOutput(JSON.stringify({ data: [], serverVersion: versionData.map[tableName] || 1 })).setMimeType(ContentService.MimeType.JSON);
+      return addCorsHeaders(ContentService.createTextOutput(JSON.stringify({ data: [], serverVersion: versionData.map[tableName] || 1 }))).setMimeType(ContentService.MimeType.JSON);
     }
 
     const values = sheet.getDataRange().getDisplayValues();
     if (values.length <= 1) {
-      return ContentService.createTextOutput(JSON.stringify({ data: [], serverVersion: versionData.map[tableName] || 1 })).setMimeType(ContentService.MimeType.JSON);
+      return addCorsHeaders(ContentService.createTextOutput(JSON.stringify({ data: [], serverVersion: versionData.map[tableName] || 1 }))).setMimeType(ContentService.MimeType.JSON);
     }
 
     const headers = values[0];
@@ -692,12 +677,112 @@ function doGet(e) {
       data.push(obj);
     }
 
-    return ContentService.createTextOutput(JSON.stringify({
+    return addCorsHeaders(ContentService.createTextOutput(JSON.stringify({
       data: data,
       serverVersion: versionData.map[tableName] || 1
-    })).setMimeType(ContentService.MimeType.JSON);
+    }))).setMimeType(ContentService.MimeType.JSON);
 
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ success: false, error: error.message })).setMimeType(ContentService.MimeType.JSON);
+    return addCorsHeaders(ContentService.createTextOutput(JSON.stringify({ success: false, error: error.message }))).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// Función para limpiar todas las sesiones activas
+function limpiarTodasLasSesiones() {
+  try {
+    Logger.log('🧹 Iniciando limpieza de sesiones...');
+
+    // Leer sesiones actuales
+    const sessionsJson = PROPERTIES.getProperty('ACTIVE_SESSIONS') || '{}';
+    const ACTIVE_SESSIONS = JSON.parse(sessionsJson);
+    const count = Object.keys(ACTIVE_SESSIONS).length;
+
+    Logger.log(`📊 Sesiones encontradas antes de limpiar: ${count}`);
+
+    // Limpiar
+    PROPERTIES.setProperty('ACTIVE_SESSIONS', '{}');
+    Logger.log('✅ LIMPIEZA COMPLETADA');
+
+    // Verificar
+    const verification = PROPERTIES.getProperty('ACTIVE_SESSIONS') || '{}';
+    const verifyCount = Object.keys(JSON.parse(verification)).length;
+    Logger.log(`✅ Sesiones después de limpiar: ${verifyCount}`);
+    Logger.log(`✅ Sistema: ${verifyCount}/${MAX_CONCURRENT_USERS} usuarios`);
+
+  } catch (error) {
+    Logger.log('❌ Error en limpiarTodasLasSesiones: ' + error.message);
+  }
+}
+
+// Función para resetear TODO el sistema (borra todas las propiedades)
+function resetearTodoElSistema() {
+  try {
+    Logger.log('⚠️ INICIANDO RESET TOTAL DEL SISTEMA...');
+
+    // Eliminar TODAS las propiedades de PropertiesService
+    PROPERTIES.deleteAllProperties();
+
+    Logger.log('✅ RESET COMPLETADO - Se borraron todas las propiedades');
+    Logger.log('✅ Las sesiones ahora serán: 0/' + MAX_CONCURRENT_USERS);
+
+  } catch (error) {
+    Logger.log('❌ Error en resetearTodoElSistema: ' + error.message);
+  }
+}
+
+// Función de DEBUG: ver qué hay en PropertiesService
+function debugProperties() {
+  try {
+    Logger.log('🔍 ========== DEBUG PROPERTIES ==========');
+
+    // Ver todas las propiedades
+    const allProps = PROPERTIES.getProperties();
+    Logger.log('Total de propiedades: ' + Object.keys(allProps).length);
+
+    for (const [key, value] of Object.entries(allProps)) {
+      if (key === 'ACTIVE_SESSIONS') {
+        const sessions = JSON.parse(value || '{}');
+        Logger.log(`📌 ${key}: ${Object.keys(sessions).length} sesiones`);
+        Logger.log('   Contenido: ' + JSON.stringify(sessions, null, 2));
+      } else {
+        Logger.log(`📌 ${key}: ${value.substring(0, 100)}...`);
+      }
+    }
+
+    Logger.log('🔍 ========== FIN DEBUG ==========');
+
+  } catch (error) {
+    Logger.log('❌ Error en debugProperties: ' + error.message);
+  }
+}
+
+// Función para cerrar TODAS las sesiones a la fuerza
+function cerrarTodasLasSesionesForce() {
+  try {
+    Logger.log('🔴 CERRANDO TODAS LAS SESIONES A LA FUERZA...');
+
+    // Leer sesiones actuales
+    const sessionsJson = PROPERTIES.getProperty('ACTIVE_SESSIONS') || '{}';
+    const ACTIVE_SESSIONS = JSON.parse(sessionsJson);
+    const sessionList = Object.keys(ACTIVE_SESSIONS);
+    const count = sessionList.length;
+
+    Logger.log(`📊 Sesiones encontradas: ${count}`);
+    if (count > 0) {
+      Logger.log('   RUTs a cerrar: ' + sessionList.join(', '));
+    }
+
+    // Borrar TODAS
+    PROPERTIES.setProperty('ACTIVE_SESSIONS', '{}');
+    Logger.log('✅ TODAS LAS SESIONES CERRADAS');
+
+    // Verificar
+    const verification = PROPERTIES.getProperty('ACTIVE_SESSIONS') || '{}';
+    const verifyCount = Object.keys(JSON.parse(verification)).length;
+    Logger.log(`✅ Verificación: ${verifyCount} sesiones activas`);
+    Logger.log(`✅ Sistema: ${verifyCount}/${MAX_CONCURRENT_USERS} usuarios`);
+
+  } catch (error) {
+    Logger.log('❌ Error: ' + error.message);
   }
 }

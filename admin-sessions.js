@@ -147,11 +147,9 @@ function inicializarActualizadorSesiones() {
         return; // No está en página admin
     }
 
-    loadActiveSessions(); // Cargar inicial desde backend
-
-    setInterval(() => {
-        loadActiveSessions(); // Actualizar desde backend cada 5 segundos
-    }, 5000);
+    // Panel de sesiones desactivado - Sistema de concurrencia eliminado
+    // loadActiveSessions();
+    // setInterval(() => { loadActiveSessions(); }, 5000);
 }
 
 // Inicializar cuando se abre el panel admin
