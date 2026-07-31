@@ -6,7 +6,7 @@
 var CONFIG = {
     CLOUD_MODE_ENABLED: true,
     // URL de Google Apps Script (valor por defecto)
-    GOOGLE_SCRIPT_URL: "https://script.google.com/macros/s/AKfycby1ZdIPq_VwkIn_lOEmYuBVoh7KCrJ1sYKKaBnVm9ScDlfjXE6bC7JXkXmUUfZnqBQkkQ/exec",
+    GOOGLE_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxEGXe6uUpWuSoMNsIpNvn9_xdFU7VX_T5wkTzs-R2wQMTcxPueo-g54SqYSjjUO0ewLw/exec",
     // Configuración de seguridad
     SECURITY: {
         MAX_LOGIN_ATTEMPTS: 5,
