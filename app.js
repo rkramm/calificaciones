@@ -594,15 +594,17 @@ const serverVersions = {};
 
 async function cloudGet(table) {
     try {
-        // Timeout agresivo: 15 segundos (mucho más rápido que 30)
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-        // Agregamos &t=Date.now() para forzar al navegador a ignorar el caché y obtener la info fresca real
-        const response = await fetch(`${GOOGLE_SCRIPT_URL}?table=${table}&t=${Date.now()}`, {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
             signal: controller.signal,
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'getTable',
+                table: table
+            })
         });
 
         clearTimeout(timeoutId);
@@ -634,9 +636,16 @@ async function cloudGet(table) {
  */
 async function cloudGetProjects(programa, entidad = '') {
     try {
-        const url = `${GOOGLE_SCRIPT_URL}?action=getProjects&programa=${encodeURIComponent(programa)}&entidad=${encodeURIComponent(entidad)}&t=${Date.now()}`;
-        console.log('📤 Buscando proyectos:', { programa, entidad, url });
-        const response = await fetch(url);
+        console.log('📤 Buscando proyectos:', { programa, entidad });
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'getProjects',
+                programa: programa,
+                entidad: entidad
+            })
+        });
         if (!response.ok) {
             console.error('❌ Error HTTP:', response.status);
             return [];

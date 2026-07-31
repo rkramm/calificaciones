@@ -81,6 +81,128 @@ function doPost(e) {
     const action = payload.action;
     const userRut = payload.userRut;
 
+    // LECTURA DE TABLAS GENÉRICAS (action: getTable)
+    if (action === 'getTable') {
+      const tableName = payload.table;
+      const filterProvincia = payload.provincia;
+      const versionData = getVersionMap();
+      const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const sheet = spreadsheet.getSheetByName(tableName);
+
+      if (!sheet) {
+        return ContentService.createTextOutput(JSON.stringify({ data: [], serverVersion: versionData.map[tableName] || 1 })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+      }
+
+      const values = sheet.getDataRange().getDisplayValues();
+      if (values.length <= 1) {
+        return ContentService.createTextOutput(JSON.stringify({ data: [], serverVersion: versionData.map[tableName] || 1 })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+      }
+
+      const headers = values[0];
+      const data = [];
+      const provinciaIndex = headers.indexOf('Provincia');
+
+      for (let i = 1; i < values.length; i++) {
+        const row = values[i];
+        if (filterProvincia && provinciaIndex >= 0 && row[provinciaIndex] !== filterProvincia) {
+          continue;
+        }
+        const obj = {};
+        for (let j = 0; j < headers.length; j++) {
+          obj[headers[j]] = row[j];
+        }
+        data.push(obj);
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        data: data,
+        serverVersion: versionData.map[tableName] || 1
+      })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+    }
+
+    // LECTURA DE PROYECTOS (action: getProjects)
+    if (action === 'getProjects') {
+      const rawPrograma = payload.programa || '';
+      const entidad = payload.entidad || '';
+      const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+      const programa = normalizePrograma(rawPrograma);
+      let sheetName;
+      if (programa === 'DS49') {
+        sheetName = '49_py';
+      } else if (programa === 'DS27') {
+        sheetName = '27_py';
+      } else if (programa === 'DS10') {
+        sheetName = '10_py';
+      } else {
+        return ContentService.createTextOutput(JSON.stringify({
+          data: [],
+          debug: 'Programa no reconocido: ' + rawPrograma + '. Se esperaba DS49, DS27 o DS10.'
+        })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+      }
+
+      const sheet = spreadsheet.getSheetByName(sheetName);
+      if (!sheet) {
+        return ContentService.createTextOutput(JSON.stringify({
+          data: [],
+          debug: 'No existe la pestaña ' + sheetName + ' para el programa ' + programa
+        })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+      }
+
+      const values = sheet.getDataRange().getDisplayValues();
+      if (values.length <= 1) {
+        return ContentService.createTextOutput(JSON.stringify({
+          data: [],
+          debug: 'La pestaña ' + sheetName + ' esta vacia o solo tiene encabezados'
+        })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+      }
+
+      const headers = values[0];
+      const data = [];
+      let entidadColIndex = -1;
+      for (let j = 0; j < headers.length; j++) {
+        const header = headers[j].toString().trim().toLowerCase();
+        if (header.includes('entidad') || header.includes('razon') || header.includes('razón') || header.includes('empresa')) {
+          entidadColIndex = j;
+          break;
+        }
+      }
+
+      const targetEntidad = normalizeEntidad(entidad);
+      let filasEvaluadas = 0;
+      let coincidencias = 0;
+
+      for (let i = 1; i < values.length; i++) {
+        const row = values[i];
+        if (!row || row.length === 0) {
+          continue;
+        }
+        filasEvaluadas++;
+        if (targetEntidad && entidadColIndex >= 0) {
+          const cellValue = row[entidadColIndex];
+          if (cellValue) {
+            const cellEntidad = normalizeEntidad(cellValue.toString());
+            if (cellEntidad !== targetEntidad && !cellEntidad.includes(targetEntidad) && !targetEntidad.includes(cellEntidad)) {
+              continue;
+            }
+          } else {
+            continue;
+          }
+        }
+        coincidencias++;
+        const obj = {};
+        for (let j = 0; j < headers.length; j++) {
+          obj[headers[j]] = row[j] || '';
+        }
+        data.push(obj);
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        data: data,
+        debug: 'Programa: ' + programa + ', Pestaña: ' + sheetName + ', Filas evaluadas: ' + filasEvaluadas + ', Coincidencias: ' + coincidencias + ', Entidad buscada: ' + entidad + ', Columna entidad: ' + entidadColIndex
+      })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+    }
+
     // Manejar login (sin límite de usuarios concurrentes)
     if (action === 'login') {
       return ContentService.createTextOutput(JSON.stringify({
