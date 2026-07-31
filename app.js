@@ -1,7 +1,7 @@
 /* ================= CONFIGURACIÓN DE ENTORNO WEB (GITHUB + GOOGLE SCRIPTS) ================= */
 // Las URLs sensibles y secrets se cargan desde config.js (no versionado)
 const CLOUD_MODE_ENABLED = CONFIG?.CLOUD_MODE_ENABLED ?? true;
-const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbwiFcJeWUpq6bh5H2zEkxPga-HKX4TyHPXiFXhHtu03NuAeaa2mlmAZ0NG2PYu9ZLc3LQ/exec";
+const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbwBbobYVMG5zUfMiBugxgfkcYxrkm7hYgNHhfvaWA4oo5hU4R7ov9o-Gqei-CYLpi9yCw/exec";
 
 // Sistema de rate limiting para login
 let loginAttempts = {};
@@ -5717,6 +5717,17 @@ function saveEvaluatorScores(callback, options = {}) {
             });
 
         console.log(`📊 recordsToSave tiene ${recordsToSave.length} registros para guardar`);
+
+        // VALIDACIÓN CRÍTICA: Prevenir registros con idTx vacío (causa duplicados)
+        const recordsWithoutIdTx = recordsToSave.filter(r => !r.idTx || r.idTx.trim() === '');
+        if (recordsWithoutIdTx.length > 0) {
+            console.error('❌ ERROR: Hay registros sin idTx válido. Esto causaría duplicados. Abortando guardado.');
+            if (!silent) {
+                showToast(`Error: ${recordsWithoutIdTx.length} registros sin ID válido. Contacte soporte.`, 'error');
+            }
+            if (callback) callback(false);
+            return;
+        }
 
         // Guardar DIRECTAMENTE en Google Sheets - Usar currentCoverage como clave maestra
         // Primero descargar todos los scores actuales de Google Sheets
