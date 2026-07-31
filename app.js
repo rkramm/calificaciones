@@ -5544,21 +5544,6 @@ function saveAdminItems() {
     tx.oncomplete = () => { alert("Textos guardados localmente. Recuerde Sincronizar a la Nube."); };
 }
 
-/**
- * Intenta leer la tabla 'scores' desde Google Sheets con un reintento automático.
- * Devuelve null SOLO si ambos intentos fallan, para que el llamador pueda abortar
- * un guardado en modo 'replace' en lugar de tratarlo como "tabla vacía".
- */
-async function _fetchScoresWithRetry() {
-    let result = await cloudGet('scores');
-    if (result === null) {
-        console.warn('⚠️ Primer intento de leer scores falló. Reintentando en 1.5s...');
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        result = await cloudGet('scores');
-    }
-    return result;
-}
-
 function saveEvaluatorScores(callback, options = {}) {
     const { silent = false } = options;
 
@@ -5738,169 +5723,86 @@ function saveEvaluatorScores(callback, options = {}) {
             return;
         }
 
-        // Guardar DIRECTAMENTE en Google Sheets - Usar currentCoverage como clave maestra
-        // Primero descargar todos los scores actuales de Google Sheets
-        _fetchScoresWithRetry().then(allGoogleScores => {
-            // 🛑 CRÍTICO: Si cloudGet falló incluso tras reintentar (retorna null por timeout/error de red/HTTP),
-            // NUNCA proceder con modo 'replace', ya que eso borraría TODA la tabla en Sheets
-            // y la reemplazaría solo con los registros de esta sesión, destruyendo el resto.
-            if (allGoogleScores === null) {
-                console.error('❌ CRÍTICO: No se pudo leer scores desde Google Sheets tras reintentar. Abortando guardado para evitar pérdida de datos.');
-                hideProgressBar();
-                if (!silent) {
-                    alert('❌ Error de conexión al guardar.\n\nNo se pudieron leer los datos actuales del servidor, por lo que el guardado fue CANCELADO para proteger la información existente.\n\nPor favor, verifique su conexión e intente guardar nuevamente.');
-                }
-                if (callback) callback(false);
-                return;
-            }
+        // Guardar DIRECTAMENTE en Google Sheets en modo incremental.
+        // NOTA (optimización de velocidad, ver commit): antes se descargaba la tabla
+        // 'scores' COMPLETA y se reconstruía otherUsersScores/otherCoverageScores/
+        // existingScoresInCobertura para reenviarla entera. Eso solo era necesario
+        // cuando el guardado usaba modo 'overwrite' (borraba y reemplazaba toda la
+        // hoja). Desde que se cambió a modo 'incremental', el backend (Code.gs) ya
+        // preserva automáticamente todo lo que no viene en el envío - solo actualiza
+        // filas por clave primaria (idTx) y borra únicamente las de deleteKeys. Por
+        // lo tanto ya no hace falta descargar ni reenviar la tabla completa: basta
+        // con enviar recordsToSave (lo del usuario actual en su cobertura actual).
 
-            if (!silent) {
-                updateProgressBar(40);
-                const pt = document.getElementById('progress-title');
-                if (pt) pt.textContent = 'Verificando datos existentes...';
-            }
+        // Ítems que el evaluador borró explícitamente en esta sesión (tombstones:
+        // score=0, modificado=true en allMemoryScores). Se piden eliminar por su
+        // idTx real - el backend solo borra esas filas exactas (ver Code.gs).
+        const tombstoneRecords = allMemoryScores.filter(r =>
+            r.rutEvaluador === currentUser.rut &&
+            r.cobertura === currentCoverage &&
+            r.score === 0 &&
+            r.modificado === true
+        );
+        const deleteKeysForBackend = tombstoneRecords.map(r => r.idTx).filter(Boolean);
+        if (deleteKeysForBackend.length > 0) {
+            console.log('🗑️ Ítems borrados explícitamente esta sesión (se eliminarán de Sheets):', deleteKeysForBackend);
+        }
 
-            // 1. Mantener scores de OTROS evaluadores
-            const otherUsersScores = (allGoogleScores || []).filter(s => s.rutEvaluador !== currentUser.rut);
+        console.log('recordsToSave cantidad:', recordsToSave.length, '| deleteKeys cantidad:', deleteKeysForBackend.length);
 
-            // 2. Mantener scores del MISMO usuario pero de OTRAS COBERTURAS
-            const otherCoverageScores = (allGoogleScores || []).filter(s => {
-                return s.rutEvaluador === currentUser.rut && s.cobertura !== currentCoverage;
-            });
+        if (!silent) {
+            updateProgressBar(50);
+            const pt = document.getElementById('progress-title');
+            if (pt) pt.textContent = 'Guardando en Google Sheets...';
+        }
 
-            // Normalización compartida para comparar claves entre allMemoryScores (JS) y
-            // allGoogleScores (recién descargado de Sheets vía getDisplayValues, todo string).
-            // Sin esto, un espacio extra en "entidad" o un stage "1" (string) vs 1 (number)
-            // hacía fallar el matching y las eliminaciones no se propagaban a Sheets.
-            const normalizeKey = (entidad, stage, itemId) =>
-                `${(entidad || '').toString().trim()}|${parseInt(stage, 10)}|${(itemId || '').toString().trim()}`;
+        // Guardar (modo incremental: actualiza/agrega por clave primaria, borra solo deleteKeys,
+        // preserva automáticamente todo lo demás - otros evaluadores, otras coberturas, etc.)
+        cloudSave('scores', recordsToSave, 'incremental', { deleteKeys: deleteKeysForBackend }).then((success) => {
+            console.log('cloudSave completado. Success:', success);
+            hasUnsavedEvaluatorChanges = false;
+            if (!silent) updateProgressBar(90);
 
-            // 3a. Ítems que el evaluador borró explícitamente en esta sesión (tombstones:
-            // score=0, modificado=true en allMemoryScores). Estos NO deben preservarse:
-            // deben desaparecer de Google Sheets, no quedar con su valor anterior.
-            const tombstoneRecords = allMemoryScores.filter(r =>
-                r.rutEvaluador === currentUser.rut &&
-                r.cobertura === currentCoverage &&
-                r.score === 0 &&
-                r.modificado === true
-            );
-            const deletedKeys = new Set(tombstoneRecords.map(r => normalizeKey(r.entidad, r.stage, r.itemId)));
-            // Claves reales (idTx) a eliminar FÍSICAMENTE de Google Sheets. El modo
-            // incremental del backend solo agrega/actualiza por clave primaria - nunca
-            // borra filas que no vienen en el envío. Por eso hay que pedirle explícitamente
-            // que elimine estas filas exactas (ver Code.gs, payload.deleteKeys).
-            const deleteKeysForBackend = tombstoneRecords.map(r => r.idTx).filter(Boolean);
-            if (deletedKeys.size > 0) {
-                console.log('🗑️ Ítems borrados explícitamente esta sesión (se eliminarán de Sheets):', Array.from(deletedKeys));
-            }
-
-            // 3b. Mantener scores del MISMO usuario, MISMA cobertura, que NO fueron modificados
-            // en esta sesión NI borrados explícitamente. Esto previene sobrescritura cuando el
-            // evaluador guarda en múltiples sesiones, sin bloquear las eliminaciones intencionales.
-            const existingScoresInCobertura = (allGoogleScores || []).filter(s => {
-                if (s.rutEvaluador !== currentUser.rut || s.cobertura !== currentCoverage) {
-                    return false;
-                }
-                const key = normalizeKey(s.entidad, s.stage, s.itemId);
-                if (deletedKeys.has(key)) {
-                    return false; // Fue borrado explícitamente: no preservar
-                }
-                // Verificar si este score ya existe en recordsToSave (misma clave normalizada)
-                const isBeingUpdated = recordsToSave.some(r => normalizeKey(r.entidad, r.stage, r.itemId) === key);
-                // Si NO está siendo actualizado, mantenerlo
-                return !isBeingUpdated;
-            });
-
-            console.log('ANTES DE GUARDAR');
-            console.log('Cobertura:', currentCoverage);
-            console.log('allGoogleScores TOTAL:', allGoogleScores ? allGoogleScores.length : 0);
-            const ds27InGoogle = allGoogleScores ? allGoogleScores.filter(s => s.programa === 'DS27').length : 0;
-            console.log('DS27 en Google Sheets AHORA:', ds27InGoogle);
-            console.log('recordsToSave cantidad:', recordsToSave.length);
-            console.log('existingScoresInCobertura cantidad (NO serán sobrescritos):', existingScoresInCobertura.length);
-
-            // 4. Combinar: otros usuarios + otras coberturas + scores existentes no modificados + nuevos scores
-            const finalScores = [...otherUsersScores, ...otherCoverageScores, ...existingScoresInCobertura, ...recordsToSave];
-            const ds27InFinal = finalScores.filter(s => s.programa === 'DS27').length;
-            console.log('DS27 en finalScores QUE SE GUARDARA:', ds27InFinal);
-            console.log('finalScores TOTAL:', finalScores.length);
-
-            if (!silent) {
-                updateProgressBar(60);
-                const pt2 = document.getElementById('progress-title');
-                if (pt2) pt2.textContent = 'Guardando en Google Sheets...';
-            }
-
-            // Guardar todo en Google Sheets (modo incremental: actualiza sin borrar otros registros,
-            // salvo las filas exactas indicadas en deleteKeys, que corresponden a notas borradas por el usuario)
-            cloudSave('scores', finalScores, 'incremental', { deleteKeys: deleteKeysForBackend }).then((success) => {
-                console.log('cloudSave completado. Success:', success);
-                hasUnsavedEvaluatorChanges = false;
-                if (!silent) updateProgressBar(85);
-
-                // Marcar registros como sincronizados (no modificados) después de guardar exitosamente
-                if (success) {
-                    recordsToSave.forEach(saved => {
-                        const idx = allMemoryScores.findIndex(r =>
-                            r.rutEvaluador === saved.rutEvaluador &&
-                            r.cobertura === saved.cobertura &&
-                            r.entidad === saved.entidad &&
-                            r.itemId === saved.itemId &&
-                            r.stage === saved.stage
-                        );
-                        if (idx >= 0) {
-                            allMemoryScores[idx].modificado = false;
-                        }
-                    });
-
-                    // Limpiar tombstones (score=0, modificado=true) ya propagados a Sheets:
-                    // su eliminación ya se aplicó, no hace falta seguir rastreándolos.
-                    allMemoryScores = allMemoryScores.filter(r =>
-                        !(r.rutEvaluador === currentUser.rut &&
-                          r.cobertura === currentCoverage &&
-                          r.score === 0 &&
-                          r.modificado === true)
+            // Marcar registros como sincronizados (no modificados) después de guardar exitosamente
+            if (success) {
+                recordsToSave.forEach(saved => {
+                    const idx = allMemoryScores.findIndex(r =>
+                        r.rutEvaluador === saved.rutEvaluador &&
+                        r.cobertura === saved.cobertura &&
+                        r.entidad === saved.entidad &&
+                        r.itemId === saved.itemId &&
+                        r.stage === saved.stage
                     );
-                }
-
-                if (!silent) {
-                    if (success) {
-                        showToast('Guardado en Google Sheets', 'success');
-                    } else {
-                        showToast('Error en cloudSave', 'error');
+                    if (idx >= 0) {
+                        allMemoryScores[idx].modificado = false;
                     }
-                }
-
-                // VERIFICAR que se guardó correctamente
-                cloudGet('scores').then(verifyScores => {
-                    const verifyCount = (verifyScores || []).length;
-                    const finalCount = finalScores.length;
-                    console.log('VERIF: finalScores=' + finalCount + ', GoogleSheets=' + verifyCount);
-
-                    if (verifyCount !== finalCount && finalCount === 0) {
-                        console.warn('ADVERTENCIA: Google Sheets NO se actualizó, reintentando...');
-                        cloudSave('scores', finalScores, 'incremental');
-                    }
-
-                    if (!silent) {
-                        updateProgressBar(100);
-                        setTimeout(() => hideProgressBar(), 300);
-                    }
-                    loadScoresFromActiveContext();
-                    renderEvaluatorView();
-                    if (callback) callback(success);
-                }).catch(() => {
-                    if (!silent) {
-                        updateProgressBar(100);
-                        setTimeout(() => hideProgressBar(), 300);
-                    }
-                    loadScoresFromActiveContext();
-                    renderEvaluatorView();
-                    if (callback) callback(success);
                 });
-            });
+
+                // Limpiar tombstones (score=0, modificado=true) ya propagados a Sheets:
+                // su eliminación ya se aplicó, no hace falta seguir rastreándolos.
+                allMemoryScores = allMemoryScores.filter(r =>
+                    !(r.rutEvaluador === currentUser.rut &&
+                      r.cobertura === currentCoverage &&
+                      r.score === 0 &&
+                      r.modificado === true)
+                );
+            }
+
+            if (!silent) {
+                if (success) {
+                    showToast('Guardado en Google Sheets', 'success');
+                } else {
+                    showToast('Error en cloudSave', 'error');
+                }
+                updateProgressBar(100);
+                setTimeout(() => hideProgressBar(), 300);
+            }
+
+            loadScoresFromActiveContext();
+            renderEvaluatorView();
+            if (callback) callback(success);
         }).catch(err => {
-            console.error('Error descargando scores:', err);
+            console.error('Error guardando scores:', err);
             hideProgressBar();
             showToast('❌ Error de conexión', 'error');
             if (callback) callback(false);
