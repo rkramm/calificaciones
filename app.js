@@ -1,7 +1,8 @@
 /* ================= CONFIGURACIÓN DE ENTORNO WEB (GITHUB + GOOGLE SCRIPTS) ================= */
 // Las URLs sensibles y secrets se cargan desde config.js (no versionado)
 const CLOUD_MODE_ENABLED = CONFIG?.CLOUD_MODE_ENABLED ?? true;
-const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbwpDWAuJtB6NWBPM5L925mi5QWm785kXEEHFmRVhYf_t-S2Fx_Y1TWzenpooXdyLeHO/exec";
+const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbweD1wd-Jfi5nCHVBgVml_B8oCso6o0zUsEDf7LrdCg6nCMZABEgEKAuoLNiah0E3hT9A/exec";  
+
 
 // Sistema de rate limiting para login
 let loginAttempts = {};
@@ -225,8 +226,8 @@ let currentEntityPage = 1; // Página actual de paginación de entidades
 const ENTITIES_PER_PAGE = 4; // Máximo de entidades por página
 const SESSION_DURATION_MS = 10 * 60 * 1000; // 10 minutos
 
-// Control de sesiones simultáneas (máximo 6 usuarios)
-const MAX_CONCURRENT_USERS = 6;
+// Control de sesiones simultáneas (máximo 10 usuarios)
+const MAX_CONCURRENT_USERS = 10;
 const ACTIVE_USER_SESSIONS = new Map(); // RUT → {loginTime, lastActivity, lastWrite}
 const SESSION_TIMEOUT_MINUTES = 15;
 const INACTIVITY_TIMEOUT_MS = SESSION_TIMEOUT_MINUTES * 60 * 1000;
