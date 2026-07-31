@@ -5797,8 +5797,8 @@ function saveEvaluatorScores(callback, options = {}) {
             console.log('DS27 en finalScores QUE SE GUARDARA:', ds27InFinal);
             console.log('finalScores TOTAL:', finalScores.length);
 
-            // Guardar todo en Google Sheets (usar overwrite para reemplazar completamente)
-            cloudSave('scores', finalScores, 'replace').then((success) => {
+            // Guardar todo en Google Sheets (modo incremental: actualiza sin borrar otros registros)
+            cloudSave('scores', finalScores, 'incremental').then((success) => {
                 console.log('cloudSave completado. Success:', success);
                 hasUnsavedEvaluatorChanges = false;
 
@@ -5842,8 +5842,8 @@ function saveEvaluatorScores(callback, options = {}) {
                     console.log('VERIF: finalScores=' + finalCount + ', GoogleSheets=' + verifyCount);
 
                     if (verifyCount !== finalCount && finalCount === 0) {
-                        console.warn('ADVERTENCIA: Google Sheets NO se limpió, reintentando...');
-                        cloudSave('scores', finalScores, 'replace');
+                        console.warn('ADVERTENCIA: Google Sheets NO se actualizó, reintentando...');
+                        cloudSave('scores', finalScores, 'incremental');
                     }
 
                     loadScoresFromActiveContext();
