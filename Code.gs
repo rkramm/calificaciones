@@ -5,21 +5,19 @@ const VERSION_SHEET_NAME = '__version__';
 const MAX_CONCURRENT_USERS = 10;
 const PROPERTIES = PropertiesService.getScriptProperties();
 
-// Manejar CORS preflight requests (Chrome y navegadores modernos)
+// NOTA: ContentService.TextOutput de Google Apps Script NO tiene método addHeader()
+// ni setHeader(). Apps Script ya agrega CORS automáticamente en peticiones POST
+// "simples" (Content-Type: text/plain), por lo que no se requiere configurar
+// headers manualmente. doOptions() solo existe por si el navegador llega a
+// mandar un preflight; debe responder sin intentar setear headers inexistentes.
 function doOptions(e) {
-  return ContentService.createTextOutput('')
-    .addHeader('Access-Control-Allow-Origin', '*')
-    .addHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .addHeader('Access-Control-Allow-Headers', 'Content-Type')
-    .setMimeType(ContentService.MimeType.TEXT);
+  return ContentService.createTextOutput('').setMimeType(ContentService.MimeType.TEXT);
 }
 
-// Helper para agregar headers CORS a cualquier response
+// Helper histórico: ya no agrega headers (addHeader no existe en TextOutput).
+// Se mantiene como no-op para no romper las llamadas existentes en doGet().
 function addCorsHeaders(output) {
-  return output
-    .addHeader('Access-Control-Allow-Origin', '*')
-    .addHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .addHeader('Access-Control-Allow-Headers', 'Content-Type');
+  return output;
 }
 
 /**
@@ -90,12 +88,12 @@ function doPost(e) {
       const sheet = spreadsheet.getSheetByName(tableName);
 
       if (!sheet) {
-        return ContentService.createTextOutput(JSON.stringify({ data: [], serverVersion: versionData.map[tableName] || 1 })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+        return ContentService.createTextOutput(JSON.stringify({ data: [], serverVersion: versionData.map[tableName] || 1 })).setMimeType(ContentService.MimeType.JSON);
       }
 
       const values = sheet.getDataRange().getDisplayValues();
       if (values.length <= 1) {
-        return ContentService.createTextOutput(JSON.stringify({ data: [], serverVersion: versionData.map[tableName] || 1 })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+        return ContentService.createTextOutput(JSON.stringify({ data: [], serverVersion: versionData.map[tableName] || 1 })).setMimeType(ContentService.MimeType.JSON);
       }
 
       const headers = values[0];
@@ -117,7 +115,7 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         data: data,
         serverVersion: versionData.map[tableName] || 1
-      })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     // LECTURA DE PROYECTOS (action: getProjects)
@@ -138,7 +136,7 @@ function doPost(e) {
         return ContentService.createTextOutput(JSON.stringify({
           data: [],
           debug: 'Programa no reconocido: ' + rawPrograma + '. Se esperaba DS49, DS27 o DS10.'
-        })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+        })).setMimeType(ContentService.MimeType.JSON);
       }
 
       const sheet = spreadsheet.getSheetByName(sheetName);
@@ -146,7 +144,7 @@ function doPost(e) {
         return ContentService.createTextOutput(JSON.stringify({
           data: [],
           debug: 'No existe la pestaña ' + sheetName + ' para el programa ' + programa
-        })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+        })).setMimeType(ContentService.MimeType.JSON);
       }
 
       const values = sheet.getDataRange().getDisplayValues();
@@ -154,7 +152,7 @@ function doPost(e) {
         return ContentService.createTextOutput(JSON.stringify({
           data: [],
           debug: 'La pestaña ' + sheetName + ' esta vacia o solo tiene encabezados'
-        })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+        })).setMimeType(ContentService.MimeType.JSON);
       }
 
       const headers = values[0];
@@ -200,7 +198,7 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         data: data,
         debug: 'Programa: ' + programa + ', Pestaña: ' + sheetName + ', Filas evaluadas: ' + filasEvaluadas + ', Coincidencias: ' + coincidencias + ', Entidad buscada: ' + entidad + ', Columna entidad: ' + entidadColIndex
-      })).setMimeType(ContentService.MimeType.JSON).addHeader('Access-Control-Allow-Origin', '*');
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     // Manejar login (sin límite de usuarios concurrentes)
