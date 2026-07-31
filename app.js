@@ -5587,6 +5587,8 @@ function saveEvaluatorScores(callback, options = {}) {
 
         if (!silent) {
             showToast('Guardando...', 'info');
+            showProgressBar('Guardando calificaciones...');
+            updateProgressBar(10);
         }
 
         // CRÍTICO: NO llamar calculateLiveScore() aquí porque:
@@ -5728,6 +5730,7 @@ function saveEvaluatorScores(callback, options = {}) {
         const recordsWithoutIdTx = recordsToSave.filter(r => !r.idTx || r.idTx.trim() === '');
         if (recordsWithoutIdTx.length > 0) {
             console.error('❌ ERROR: Hay registros sin idTx válido. Esto causaría duplicados. Abortando guardado.');
+            hideProgressBar();
             if (!silent) {
                 showToast(`Error: ${recordsWithoutIdTx.length} registros sin ID válido. Contacte soporte.`, 'error');
             }
@@ -5749,6 +5752,12 @@ function saveEvaluatorScores(callback, options = {}) {
                 }
                 if (callback) callback(false);
                 return;
+            }
+
+            if (!silent) {
+                updateProgressBar(40);
+                const pt = document.getElementById('progress-title');
+                if (pt) pt.textContent = 'Verificando datos existentes...';
             }
 
             // 1. Mantener scores de OTROS evaluadores
@@ -5816,11 +5825,18 @@ function saveEvaluatorScores(callback, options = {}) {
             console.log('DS27 en finalScores QUE SE GUARDARA:', ds27InFinal);
             console.log('finalScores TOTAL:', finalScores.length);
 
+            if (!silent) {
+                updateProgressBar(60);
+                const pt2 = document.getElementById('progress-title');
+                if (pt2) pt2.textContent = 'Guardando en Google Sheets...';
+            }
+
             // Guardar todo en Google Sheets (modo incremental: actualiza sin borrar otros registros,
             // salvo las filas exactas indicadas en deleteKeys, que corresponden a notas borradas por el usuario)
             cloudSave('scores', finalScores, 'incremental', { deleteKeys: deleteKeysForBackend }).then((success) => {
                 console.log('cloudSave completado. Success:', success);
                 hasUnsavedEvaluatorChanges = false;
+                if (!silent) updateProgressBar(85);
 
                 // Marcar registros como sincronizados (no modificados) después de guardar exitosamente
                 if (success) {
@@ -5866,10 +5882,18 @@ function saveEvaluatorScores(callback, options = {}) {
                         cloudSave('scores', finalScores, 'incremental');
                     }
 
+                    if (!silent) {
+                        updateProgressBar(100);
+                        setTimeout(() => hideProgressBar(), 300);
+                    }
                     loadScoresFromActiveContext();
                     renderEvaluatorView();
                     if (callback) callback(success);
                 }).catch(() => {
+                    if (!silent) {
+                        updateProgressBar(100);
+                        setTimeout(() => hideProgressBar(), 300);
+                    }
                     loadScoresFromActiveContext();
                     renderEvaluatorView();
                     if (callback) callback(success);
@@ -5877,6 +5901,7 @@ function saveEvaluatorScores(callback, options = {}) {
             });
         }).catch(err => {
             console.error('Error descargando scores:', err);
+            hideProgressBar();
             showToast('❌ Error de conexión', 'error');
             if (callback) callback(false);
         });
