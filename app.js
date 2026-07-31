@@ -1,7 +1,7 @@
 /* ================= CONFIGURACIÓN DE ENTORNO WEB (GITHUB + GOOGLE SCRIPTS) ================= */
 // Las URLs sensibles y secrets se cargan desde config.js (no versionado)
 const CLOUD_MODE_ENABLED = CONFIG?.CLOUD_MODE_ENABLED ?? true;
-const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbweD1wd-Jfi5nCHVBgVml_B8oCso6o0zUsEDf7LrdCg6nCMZABEgEKAuoLNiah0E3hT9A/exec";  
+const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbxMFOTXArIzeUEqW_cERUgYB7S2k8siTZkN0SiMGI5De1444ne0beruUqOEThwiNQq0BQ/exec";  
 
 
 // Sistema de rate limiting para login
@@ -3394,13 +3394,6 @@ async function attemptEvaluatorLogin(evaluadores, userInput, passInput) {
 
     // Éxito: limpiar intentos fallidos
     delete loginAttempts[userInput];
-
-    // ⏳ VERIFICAR LÍMITE DE USUARIOS SIMULTÁNEOS (LOCAL)
-    if (ACTIVE_USER_SESSIONS.size >= MAX_CONCURRENT_USERS) {
-        alert(`⚠️ SISTEMA SATURADO\n\n❌ Se alcanzó el máximo de ${MAX_CONCURRENT_USERS} usuarios simultáneos.\n\n⏰ Por favor, intente de nuevo en 5 minutos.\n\nSi tiene problemas, contacte al administrador.\n\nUsuarios conectados: ${ACTIVE_USER_SESSIONS.size}/${MAX_CONCURRENT_USERS}`);
-        restoreConnectionStatus();
-        return;
-    }
 
     // Agregar usuario a sesiones activas con metadata
     const ahora = Date.now();
