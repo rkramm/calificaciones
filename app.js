@@ -1,7 +1,7 @@
 /* ================= CONFIGURACIÓN DE ENTORNO WEB (GITHUB + GOOGLE SCRIPTS) ================= */
 // Las URLs sensibles y secrets se cargan desde config.js (no versionado)
 const CLOUD_MODE_ENABLED = CONFIG?.CLOUD_MODE_ENABLED ?? true;
-const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbzYCLJutiR_JyOgFFUJP4wXim_QXcPPpeYZI2AjXx7rgk0vUyR_doFAeu5W-9KFRbjK9w/exec";  
+const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycby1ZdIPq_VwkIn_lOEmYuBVoh7KCrJ1sYKKaBnVm9ScDlfjXE6bC7JXkXmUUfZnqBQkkQ/exec";  
 
 
 // Sistema de rate limiting para login
@@ -600,7 +600,7 @@ async function cloudGet(table) {
         const response = await fetch(GOOGLE_SCRIPT_URL, {
             signal: controller.signal,
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'getTable',
                 table: table
@@ -639,7 +639,7 @@ async function cloudGetProjects(programa, entidad = '') {
         console.log('📤 Buscando proyectos:', { programa, entidad });
         const response = await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'getProjects',
                 programa: programa,
