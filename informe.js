@@ -654,9 +654,9 @@ function renderEntidades(){
           <div class="card-scroll">
             <table class="data" id="tbl-entidades" style="table-layout:fixed; min-width:1040px">
               <colgroup>
-                <col style="width:20%"><col style="width:10%"><col style="width:10%">
-                <col style="width:7%"><col style="width:6%"><col style="width:7%">
-                <col style="width:6%"><col style="width:14%"><col style="width:20%">
+                <col style="width:18%"><col style="width:9%"><col style="width:9%">
+                <col style="width:6%"><col style="width:6%"><col style="width:6%">
+                <col style="width:6%"><col style="width:12%"><col style="width:10%"><col style="width:18%">
               </colgroup>
               <thead><tr>
                 <th data-k="nombre">Entidad</th>
@@ -667,6 +667,7 @@ function renderEntidades(){
                 <th data-k="familias" class="num-center">Familias</th>
                 <th data-k="y2025" class="num-center">2025</th>
                 <th data-k="avgScoreGlobal">2026 (actual)</th>
+                <th data-k="consenso" class="num-center">Consenso</th>
                 <th data-k="comentario">Comentario</th>
               </tr></thead>
               <tbody></tbody>
@@ -684,10 +685,11 @@ function renderEntidades(){
     paintEntidadesTable();
   }));
   $('#btn-export-entidades').addEventListener('click', () => {
-    const headers = ['Entidad','Provincia(s)','Programa(s)','N° comunas','Proyectos','Familias','2025','2026 (actual)','Comentario'];
+    const headers = ['Entidad','Provincia(s)','Programa(s)','N° comunas','Proyectos','Familias','2025','2026 (actual)','Consenso','Comentario'];
     const rows = getSortedEntidades().map(e => [
       e.nombre, e.provincias.join(', '), e.programas.join(', '), e.comunas.length,
       e.proyectos, e.familias, e.y2025 ?? '', e.avgScoreGlobal!=null ? Math.round(e.avgScoreGlobal) : '',
+      comentariosMap.get(e.rut)?.calificacion ?? '',
       comentariosMap.get(e.rut)?.comentario || '',
     ]);
     exportXlsx('Entidades_Precalificaciones.xlsx', 'Entidades', headers, rows);
@@ -701,6 +703,9 @@ function getSortedEntidades(){
     if (entSort.key === 'comentario') {
       va = comentariosMap.get(a.rut)?.comentario || '';
       vb = comentariosMap.get(b.rut)?.comentario || '';
+    } else if (entSort.key === 'consenso') {
+      va = comentariosMap.get(a.rut)?.calificacion;
+      vb = comentariosMap.get(b.rut)?.calificacion;
     } else {
       va = a[entSort.key]; vb = b[entSort.key];
       if (Array.isArray(va)) { va = va.length; vb = vb.length; }
@@ -725,9 +730,10 @@ function paintEntidadesTable(){
       <td class="num-center">${fmt0(e.familias)}</td>
       <td class="num-center">${e.y2025!=null?fmt0(e.y2025):'—'}</td>
       <td>${scoreBadge(e.avgScoreGlobal)}</td>
+      <td class="num-center">${comentariosMap.get(e.rut)?.calificacion!=null?fmt0(comentariosMap.get(e.rut).calificacion):'—'}</td>
       <td class="ellipsis" title="${esc(comentariosMap.get(e.rut)?.comentario || '')}">${esc(comentariosMap.get(e.rut)?.comentario || '—')}</td>
     </tr>
-  `).join('') || `<tr><td colspan="9"><div class="empty-state">No hay entidades que coincidan con los filtros.</div></td></tr>`;
+  `).join('') || `<tr><td colspan="10"><div class="empty-state">No hay entidades que coincidan con los filtros.</div></td></tr>`;
   $$('#tbl-entidades tbody tr').forEach(tr => tr.addEventListener('click', () => openEntidadDetail(tr.dataset.rut)));
 }
 
@@ -779,9 +785,22 @@ function computeCalculoNota(e){
   return { columnas, totalFamilias, resultadoFinal, completo: evaluadas.length === columnas.length };
 }
 
-function calculoNotaHtml(calc){
+function calculoNotaHtml(calc, e){
   if (!calc) return '';
   const cols = calc.columnas;
+  const manual = comentariosMap.get(e.rut)?.calificacion;
+  const manualVal = manual != null ? manual : null;
+
+  // Si la comisión ingresó una nota manual, reescalar "Resultado por programa"
+  // proporcionalmente (mismos pesos) para que la suma ponderada dé la nota
+  // manual. Es solo una vista: NO modifica los puntajes reales de items/etapas
+  // en la hoja scores, que siguen siendo el registro oficial de cada evaluador.
+  let colsDisplay = cols;
+  if (manualVal != null && calc.resultadoFinal != null && calc.resultadoFinal !== 0) {
+    const factor = manualVal / calc.resultadoFinal;
+    colsDisplay = cols.map(c => ({ ...c, resultado: c.resultado != null ? c.resultado * factor : null }));
+  }
+
   let rows = '';
   rows += `<tr><td>Programa</td>${cols.map(c=>`<td class="num-center"><span class="pill"><span class="dot" style="background:${PROGRAMA_COLOR[c.programa]}"></span>${esc(c.programa)}</span></td>`).join('')}</tr>`;
   rows += `<tr><td>Familias</td>${cols.map(c=>`<td class="num-center">${fmt0(c.familias)}</td>`).join('')}</tr>`;
@@ -791,9 +810,9 @@ function calculoNotaHtml(calc){
     const label = s===2 ? `Etapa 2 · ${RUBRICA_ETAPAS[2].nombre}` : `Etapa ${s}`;
     rows += `<tr><td>${esc(label)}</td>${cols.map(c=>`<td class="num-center">${c.stageAvgs[s]!=null?fmt0(c.stageAvgs[s]):'—'}</td>`).join('')}</tr>`;
   }
-  rows += `<tr style="font-weight:700"><td>Resultado por programa</td>${cols.map(c=>`<td class="num-center">${c.resultado!=null?fmt0(c.resultado):'—'}</td>`).join('')}</tr>`;
+  rows += `<tr style="font-weight:700"><td>Resultado por programa${manualVal!=null?' (ajustado)':''}</td>${colsDisplay.map(c=>`<td class="num-center">${c.resultado!=null?fmt0(c.resultado):'—'}</td>`).join('')}</tr>`;
 
-  const resultadoTxt = calc.resultadoFinal!=null ? scoreBadge(calc.resultadoFinal) : `<span class="hint">Pendiente (faltan etapas por calificar)</span>`;
+  const autoTxt = calc.resultadoFinal!=null ? scoreBadge(calc.resultadoFinal) : `<span class="hint">Pendiente (faltan etapas por calificar)</span>`;
 
   return `
     <div>
@@ -802,7 +821,17 @@ function calculoNotaHtml(calc){
       <table class="data compact-cols" style="min-width:0; width:100%; table-layout:fixed">
         <tbody>${rows}</tbody>
       </table>
-      <div class="kv-row" style="margin-top:4px"><span class="k"><b>Resultado calificación</b></span><span class="v">${resultadoTxt}</span></div>
+      <div class="kv-row" style="margin-top:4px"><span class="k">Resultado automático</span><span class="v">${autoTxt}</span></div>
+      <div class="kv-row" style="margin-top:4px">
+        <span class="k">Nota final (comisión)</span>
+        <span class="v" style="gap:8px">
+          <input type="number" id="calculo-nota-manual-input" min="0" max="100" step="1"
+            value="${manualVal!=null?manualVal:''}" placeholder="${calc.resultadoFinal!=null?fmt0(calc.resultadoFinal):'—'}"
+            style="width:64px; background:var(--surface-2); border:1px solid var(--border); color:var(--text-primary); border-radius:6px; padding:5px 8px; font:inherit; font-size:13px;">
+          <button type="button" id="btn-guardar-nota-manual" class="comment-modal-btn primary" style="padding:5px 10px;">Guardar</button>
+        </span>
+      </div>
+      <div class="hint" style="margin-top:4px">Dejar vacío y guardar para volver al resultado automático. Se guarda como la calificación de consenso de esta entidad.</div>
     </div>
   `;
 }
@@ -841,7 +870,7 @@ function openEntidadDetail(rut){
         <div class="kv-row"><span class="k">Familias beneficiadas</span><span class="v">${fmt0(e.familias)}</span></div>
       </div>
 
-      ${calculoNotaHtml(calculoNota)}
+      ${calculoNotaHtml(calculoNota, e)}
 
       ${(HIST_YEARS.some(y=>e.histYears[y]!=null)||e.avgScoreGlobal!=null) ? `
       <div>
@@ -893,6 +922,19 @@ function openEntidadDetail(rut){
   $('#entidad-detail-close').addEventListener('click', closeEntidadDetail);
   $('#entidades-split').classList.add('detail-open');
   wireCommentButtons(pane);
+
+  const btnGuardarNota = $('#btn-guardar-nota-manual');
+  if (btnGuardarNota) {
+    btnGuardarNota.addEventListener('click', async () => {
+      const val = $('#calculo-nota-manual-input').value;
+      const existing = comentariosMap.get(e.rut);
+      const comentarioExistente = existing ? existing.comentario : '';
+      btnGuardarNota.disabled = true;
+      await saveComentario(e.rut, e.nombre, val, comentarioExistente);
+      openEntidadDetail(e.rut);
+      paintEntidadesTable();
+    });
+  }
 
   if ($('#detail-trend')) {
     lineChart($('#detail-trend'), [{ label:e.nombre, color:'var(--series-1)', points:[
