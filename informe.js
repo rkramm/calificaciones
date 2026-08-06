@@ -654,9 +654,9 @@ function renderEntidades(){
           <div class="card-scroll">
             <table class="data" id="tbl-entidades" style="table-layout:fixed; min-width:1040px">
               <colgroup>
-                <col style="width:26%"><col style="width:12%"><col style="width:12%">
-                <col style="width:9%"><col style="width:7%"><col style="width:8%">
-                <col style="width:7%"><col style="width:19%">
+                <col style="width:20%"><col style="width:10%"><col style="width:10%">
+                <col style="width:7%"><col style="width:6%"><col style="width:7%">
+                <col style="width:6%"><col style="width:14%"><col style="width:20%">
               </colgroup>
               <thead><tr>
                 <th data-k="nombre">Entidad</th>
@@ -667,6 +667,7 @@ function renderEntidades(){
                 <th data-k="familias" class="num-center">Familias</th>
                 <th data-k="y2025" class="num-center">2025</th>
                 <th data-k="avgScoreGlobal">2026 (actual)</th>
+                <th data-k="comentario">Comentario</th>
               </tr></thead>
               <tbody></tbody>
             </table>
@@ -683,10 +684,11 @@ function renderEntidades(){
     paintEntidadesTable();
   }));
   $('#btn-export-entidades').addEventListener('click', () => {
-    const headers = ['Entidad','Provincia(s)','Programa(s)','N° comunas','Proyectos','Familias','2025','2026 (actual)'];
+    const headers = ['Entidad','Provincia(s)','Programa(s)','N° comunas','Proyectos','Familias','2025','2026 (actual)','Comentario'];
     const rows = getSortedEntidades().map(e => [
       e.nombre, e.provincias.join(', '), e.programas.join(', '), e.comunas.length,
       e.proyectos, e.familias, e.y2025 ?? '', e.avgScoreGlobal!=null ? Math.round(e.avgScoreGlobal) : '',
+      comentariosMap.get(e.rut)?.comentario || '',
     ]);
     exportXlsx('Entidades_Precalificaciones.xlsx', 'Entidades', headers, rows);
   });
@@ -695,8 +697,14 @@ function renderEntidades(){
 function getSortedEntidades(){
   const list = filteredEntidades().slice();
   list.sort((a,b) => {
-    let va = a[entSort.key], vb = b[entSort.key];
-    if (Array.isArray(va)) { va = va.length; vb = vb.length; }
+    let va, vb;
+    if (entSort.key === 'comentario') {
+      va = comentariosMap.get(a.rut)?.comentario || '';
+      vb = comentariosMap.get(b.rut)?.comentario || '';
+    } else {
+      va = a[entSort.key]; vb = b[entSort.key];
+      if (Array.isArray(va)) { va = va.length; vb = vb.length; }
+    }
     if (va == null) va = -Infinity; if (vb == null) vb = -Infinity;
     if (typeof va === 'string') return va.localeCompare(vb) * entSort.dir;
     return (va - vb) * entSort.dir;
@@ -717,8 +725,9 @@ function paintEntidadesTable(){
       <td class="num-center">${fmt0(e.familias)}</td>
       <td class="num-center">${e.y2025!=null?fmt0(e.y2025):'—'}</td>
       <td>${scoreBadge(e.avgScoreGlobal)}</td>
+      <td class="ellipsis" title="${esc(comentariosMap.get(e.rut)?.comentario || '')}">${esc(comentariosMap.get(e.rut)?.comentario || '—')}</td>
     </tr>
-  `).join('') || `<tr><td colspan="8"><div class="empty-state">No hay entidades que coincidan con los filtros.</div></td></tr>`;
+  `).join('') || `<tr><td colspan="9"><div class="empty-state">No hay entidades que coincidan con los filtros.</div></td></tr>`;
   $$('#tbl-entidades tbody tr').forEach(tr => tr.addEventListener('click', () => openEntidadDetail(tr.dataset.rut)));
 }
 
