@@ -1,7 +1,7 @@
 /* ================= CONFIGURACIÓN DE ENTORNO WEB (GITHUB + GOOGLE SCRIPTS) ================= */
 // Las URLs sensibles y secrets se cargan desde config.js (no versionado)
 const CLOUD_MODE_ENABLED = CONFIG?.CLOUD_MODE_ENABLED ?? true;
-const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbxGeOLt4n4sWBTZDySTkSSYwMsUywew3Q_xPxCb32A1CGMkfIOgxF4ulalYGkLustZ49Q/exec";
+const GOOGLE_SCRIPT_URL = CONFIG?.GOOGLE_SCRIPT_URL ?? "https://script.google.com/macros/s/AKfycbwZe9nIWRvpnrvK5VIvXsk2mEdVcvMswl2nyIqcrnKu9YA3dgUZDoB-m_9ep2YcoaO9/exec";
 
 
 // Sistema de rate limiting para login
@@ -2722,6 +2722,14 @@ function setupAdminTabs() {
     const tabs = document.querySelectorAll('.admin-main-tab');
     tabs.forEach(tab => {
         tab.addEventListener('click', (e) => {
+            // "Reportes Consolidados" fue reemplazado por informe.html (página nueva
+            // y separada, con su propio login). Se abre en una pestaña nueva en vez
+            // de cambiar de panel - el panel-reportes original queda intacto pero
+            // inalcanzable desde la UI.
+            if (e.target.id === 'btn-tab-reportes') {
+                window.open('informe.html', '_blank');
+                return;
+            }
             tabs.forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.admin-subpanel').forEach(p => p.classList.add('hidden'));
             e.target.classList.add('active');

@@ -79,6 +79,32 @@ function doPost(e) {
     const action = payload.action;
     const userRut = payload.userRut;
 
+    // Verificación de contraseña de admin SIN exponer la contraseña al cliente
+    // (usada por informe.html, que tiene su propio login separado). Compara
+    // server-side y retorna solo un booleano, nunca el valor de clave_admin.
+    if (action === 'verifyAdminPassword') {
+      const providedPassword = (payload.password || '').toString();
+      const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const sheet = spreadsheet.getSheetByName('configuracion');
+      let claveAdmin = '';
+      if (sheet) {
+        const values = sheet.getDataRange().getDisplayValues();
+        const headers = values.length > 0 ? values[0] : [];
+        const claveIdx = headers.indexOf('clave');
+        const valorIdx = headers.indexOf('valor');
+        if (claveIdx >= 0 && valorIdx >= 0) {
+          for (let i = 1; i < values.length; i++) {
+            if (values[i][claveIdx] === 'clave_admin') {
+              claveAdmin = values[i][valorIdx];
+              break;
+            }
+          }
+        }
+      }
+      const valid = providedPassword !== '' && providedPassword === claveAdmin;
+      return ContentService.createTextOutput(JSON.stringify({ success: valid })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // LECTURA DE TABLAS GENÉRICAS (action: getTable)
     if (action === 'getTable') {
       const tableName = payload.table;
