@@ -81,7 +81,9 @@ const serverVersions = {};
 async function cloudGet(table){
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    // 45s: este backend puede tardar bastante más de los 15s habituales bajo
+    // ciertas condiciones (posible cold-start de Apps Script + spreadsheet grande).
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
     const response = await fetch(GOOGLE_SCRIPT_URL, {
       signal: controller.signal,
       method: 'POST',
@@ -165,24 +167,37 @@ let entidadesRows = [], asignacionesRows = [], scoresRows = [], historicoRows = 
 let py49Rows = [], py27Rows = [], py10Rows = [];
 
 async function loadAllData(){
-  const [entidades, asignaciones, scores, historico, py49, py27, py10, comentarios] = await Promise.all([
-    cloudGet('entidades'),
-    cloudGet('asignaciones'),
-    cloudGet('scores'),
-    cloudGet('Califica_historico'),
-    cloudGet('49_py'),
-    cloudGet('27_py'),
-    cloudGet('10_py'),
-    cloudGet('Reunion_calificacion'),
-  ]);
-  entidadesRows    = Array.isArray(entidades) ? entidades : [];
-  asignacionesRows = Array.isArray(asignaciones) ? asignaciones : [];
-  scoresRows       = Array.isArray(scores) ? scores.map(s => ({ ...s, stage: parseInt(s.stage,10), score: parseFloat(s.score) })) : [];
-  historicoRows    = Array.isArray(historico) ? historico : [];
-  py49Rows         = Array.isArray(py49) ? py49 : [];
-  py27Rows         = Array.isArray(py27) ? py27 : [];
-  py10Rows         = Array.isArray(py10) ? py10 : [];
-  loadComentariosFromRows(Array.isArray(comentarios) ? comentarios : []);
+  // Carga secuencial (no Promise.all): este backend de Apps Script puede tener
+  // contención cuando recibe varias ejecuciones simultáneas contra el mismo
+  // script/spreadsheet, lo que hacía que las 8 lecturas en paralelo se
+  // demoraran más que el timeout individual. Uno por uno es más lento en
+  // total, pero mucho más confiable - y esta página se carga una sola vez,
+  // no repetidamente como el calificador.
+  const tables = [
+    ['entidades', 'Entidades'],
+    ['asignaciones', 'Asignaciones'],
+    ['scores', 'Calificaciones'],
+    ['Califica_historico', 'Histórico'],
+    ['49_py', 'Proyectos DS49'],
+    ['27_py', 'Proyectos DS27'],
+    ['10_py', 'Proyectos DS10'],
+    ['Reunion_calificacion', 'Comentarios de consenso'],
+  ];
+  const results = {};
+  const statusEl = document.getElementById('data-status');
+  for (let i = 0; i < tables.length; i++) {
+    const [key, label] = tables[i];
+    if (statusEl) statusEl.textContent = `Cargando ${label}… (${i + 1}/${tables.length})`;
+    results[key] = await cloudGet(key);
+  }
+  entidadesRows    = Array.isArray(results.entidades) ? results.entidades : [];
+  asignacionesRows = Array.isArray(results.asignaciones) ? results.asignaciones : [];
+  scoresRows       = Array.isArray(results.scores) ? results.scores.map(s => ({ ...s, stage: parseInt(s.stage,10), score: parseFloat(s.score) })) : [];
+  historicoRows    = Array.isArray(results.Califica_historico) ? results.Califica_historico : [];
+  py49Rows         = Array.isArray(results['49_py']) ? results['49_py'] : [];
+  py27Rows         = Array.isArray(results['27_py']) ? results['27_py'] : [];
+  py10Rows         = Array.isArray(results['10_py']) ? results['10_py'] : [];
+  loadComentariosFromRows(Array.isArray(results.Reunion_calificacion) ? results.Reunion_calificacion : []);
 }
 
 /* ======================================================================
@@ -431,6 +446,7 @@ function rebuildData(){
    ====================================================================== */
 const state = { programa:'', provincia:'', search:'', view:'entidades' };
 function filteredCoberturas(){
+  if (!coberturas) return []; // Datos aún no cargados (rebuildData no ha corrido todavía)
   return Array.from(coberturas.values()).filter(c => {
     if (state.programa && c.programa !== state.programa) return false;
     if (state.provincia && c.provincia !== state.provincia) return false;
@@ -439,6 +455,7 @@ function filteredCoberturas(){
   });
 }
 function filteredEntidades(){
+  if (!entidadesList) return []; // Datos aún no cargados
   const covKeys = new Set(filteredCoberturas().map(c=>c.key));
   return entidadesList.filter(e => {
     if (state.search && !normName(e.nombre).includes(normName(state.search))) return false;
