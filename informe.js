@@ -101,13 +101,17 @@ async function cloudGet(table){
   }
 }
 
-async function cloudSave(table, dataArray, mode='incremental'){
+async function cloudSave(table, dataArray, mode='incremental', options={}){
   try {
     const clientVersion = serverVersions[table] || 1;
+    const body = { table, data: dataArray, mode, clientVersion };
+    if (options.deleteKeys && options.deleteKeys.length > 0) {
+      body.deleteKeys = options.deleteKeys;
+    }
     const response = await fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ table, data: dataArray, mode, clientVersion })
+      body: JSON.stringify(body)
     });
     const result = await response.json();
     if (result && result.success && typeof result.serverVersion === 'number') {
@@ -266,9 +270,9 @@ async function saveComentario(rut, nombreEntidad, calificacion, comentario){
 }
 async function deleteComentario(rut){
   comentariosMap.delete(rut);
-  // El modo incremental del backend no borra filas por sí solo: se sobreescriben
-  // calificacion/comentario a vacío para que deje de mostrarse como comentario activo.
-  const result = await cloudSave('Reunion_calificacion', [{ rut, nombreEntidad: '', calificacion: '', comentario: '' }], 'incremental');
+  // Borrado real: la fila con este rut se elimina físicamente de Reunion_calificacion
+  // (mismo mecanismo deleteKeys que usa el calificador para borrar notas de scores).
+  const result = await cloudSave('Reunion_calificacion', [], 'incremental', { deleteKeys: [rut] });
   if (!result || !result.success) {
     alert('⚠️ No se pudo confirmar el borrado en el servidor.');
   }
