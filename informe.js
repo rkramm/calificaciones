@@ -279,13 +279,17 @@ function initCommentModal(){
   $('#comment-modal-backdrop').addEventListener('click', e => { if (e.target.id === 'comment-modal-backdrop') closeCommentModal(); });
   $('#comment-modal-save').addEventListener('click', async () => {
     if (!commentModalRut) return;
-    const e = entidadesList.find(x => x.rut === commentModalRut);
-    const nombreEntidad = e ? e.nombre : (comentariosMap.get(commentModalRut)?.nombreEntidad || '');
+    // Capturar ANTES de closeCommentModal(), que pone commentModalRut = null.
+    // Bug anterior: se leía commentModalRut después de cerrar el modal, por lo
+    // que siempre se guardaba rut: null en Reunion_calificacion.
+    const rut = commentModalRut;
+    const e = entidadesList.find(x => x.rut === rut);
+    const nombreEntidad = e ? e.nombre : (comentariosMap.get(rut)?.nombreEntidad || '');
     const califVal = $('#comment-modal-calificacion').value;
     const textoVal = $('#comment-modal-textarea').value;
     closeCommentModal();
     refreshOpenCommentTargets();
-    await saveComentario(commentModalRut, nombreEntidad, califVal, textoVal);
+    await saveComentario(rut, nombreEntidad, califVal, textoVal);
     refreshOpenCommentTargets();
   });
   $('#comment-modal-delete').addEventListener('click', async () => {
