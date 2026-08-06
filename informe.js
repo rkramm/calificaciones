@@ -409,10 +409,16 @@ function rebuildData(){
   function addProyecto(nombreRaw, programa, familias){
     if (!nombreRaw) return;
     const key = normName(nombreRaw);
-    if (!proyectosPorEntidad.has(key)) proyectosPorEntidad.set(key, { count:0, familias:0 });
+    if (!proyectosPorEntidad.has(key)) {
+      proyectosPorEntidad.set(key, { count:0, familias:0, familiasPorPrograma:{DS49:0,DS27:0,DS10:0} });
+    }
     const p = proyectosPorEntidad.get(key);
     p.count += 1;
-    const f = Number(familias); if (!isNaN(f)) p.familias += f;
+    const f = Number(familias);
+    if (!isNaN(f)) {
+      p.familias += f;
+      if (p.familiasPorPrograma[programa] != null) p.familiasPorPrograma[programa] += f;
+    }
   }
   py49Rows.forEach(r => addProyecto(r.Entidad, 'DS49', r['Nº FAMILIAS']));
   py27Rows.forEach(r => addProyecto(r.Entidad, 'DS27', r.Nfamilias));
@@ -444,6 +450,7 @@ function rebuildData(){
       histYears: hist ? hist.years : {},
       y2024: hist ? hist.y2024 : null, y2025: hist ? hist.y2025 : null,
       proyectos: proy ? proy.count : 0, familias: proy ? proy.familias : 0,
+      familiasPorPrograma: proy ? proy.familiasPorPrograma : {DS49:0,DS27:0,DS10:0},
       numEvaluadores: evaluadoresSet.size,
     };
   });
@@ -715,6 +722,82 @@ function paintEntidadesTable(){
   $$('#tbl-entidades tbody tr').forEach(tr => tr.addEventListener('click', () => openEntidadDetail(tr.dataset.rut)));
 }
 
+/**
+ * "Cálculo Nota": promedio ponderado por participación de familias entre
+ * los distintos programas de una entidad (solo aplica si tiene más de 1
+ * cobertura o programa). Coberturas del mismo programa en provincias
+ * distintas se combinan en una sola columna. Fórmula confirmada por el
+ * usuario con datos reales: % participación = familias del programa /
+ * total de familias; resultado por programa = promedio de las etapas con
+ * datos; resultado final = suma ponderada (resultado × % participación).
+ * Si algún programa con familias > 0 aún no tiene etapas calificadas, el
+ * % de participación se recalcula solo entre los programas ya evaluados.
+ */
+function computeCalculoNota(e){
+  if (e.coberturas.length <= 1) return null;
+
+  const porPrograma = {};
+  e.coberturas.forEach(c => {
+    if (!porPrograma[c.programa]) porPrograma[c.programa] = { stageScores: {1:[],2:[],3:[],4:[],5:[],6:[]} };
+    for (let s=1; s<=6; s++) porPrograma[c.programa].stageScores[s].push(...c.stageScores[s]);
+  });
+
+  const programasPresentes = Object.keys(porPrograma).sort((a,b)=>PROGRAMA_ORDER.indexOf(a)-PROGRAMA_ORDER.indexOf(b));
+  const totalFamilias = programasPresentes.reduce((sum,p) => sum + (e.familiasPorPrograma[p]||0), 0);
+
+  const columnas = programasPresentes.map(p => {
+    const stageAvgs = {};
+    for (let s=1; s<=6; s++) {
+      const vals = porPrograma[p].stageScores[s];
+      stageAvgs[s] = vals.length ? mean(vals) : null;
+    }
+    const nonNull = Object.values(stageAvgs).filter(v=>v!=null);
+    const resultado = nonNull.length ? mean(nonNull) : null;
+    const familias = e.familiasPorPrograma[p] || 0;
+    const participacion = totalFamilias > 0 ? familias/totalFamilias : 0;
+    return { programa:p, familias, participacion, stageAvgs, resultado };
+  });
+
+  const evaluadas = columnas.filter(c => c.resultado != null);
+  const totalFamiliasEvaluadas = evaluadas.reduce((sum,c)=>sum+c.familias, 0);
+  let resultadoFinal = null;
+  if (evaluadas.length > 0) {
+    resultadoFinal = totalFamiliasEvaluadas > 0
+      ? evaluadas.reduce((sum,c) => sum + c.resultado * (c.familias/totalFamiliasEvaluadas), 0)
+      : mean(evaluadas.map(c=>c.resultado)); // sin familias registradas en las columnas evaluadas: promedio simple
+  }
+
+  return { columnas, totalFamilias, resultadoFinal, completo: evaluadas.length === columnas.length };
+}
+
+function calculoNotaHtml(calc){
+  if (!calc) return '';
+  const cols = calc.columnas;
+  let rows = '';
+  rows += `<tr><td>Programa</td>${cols.map(c=>`<td class="num-center"><span class="pill"><span class="dot" style="background:${PROGRAMA_COLOR[c.programa]}"></span>${esc(c.programa)}</span></td>`).join('')}</tr>`;
+  rows += `<tr><td>Familias</td>${cols.map(c=>`<td class="num-center">${fmt0(c.familias)}</td>`).join('')}</tr>`;
+  rows += `<tr><td><b>Total</b></td><td class="num-center" colspan="${cols.length}"><b>${fmt0(calc.totalFamilias)}</b></td></tr>`;
+  rows += `<tr><td>% Participación</td>${cols.map(c=>`<td class="num-center">${(c.participacion*100).toFixed(2)}%</td>`).join('')}</tr>`;
+  for (let s=1; s<=6; s++){
+    const label = s===2 ? `Etapa 2 · ${RUBRICA_ETAPAS[2].nombre}` : `Etapa ${s}`;
+    rows += `<tr><td>${esc(label)}</td>${cols.map(c=>`<td class="num-center">${c.stageAvgs[s]!=null?fmt0(c.stageAvgs[s]):'—'}</td>`).join('')}</tr>`;
+  }
+  rows += `<tr style="font-weight:700"><td>Resultado por programa</td>${cols.map(c=>`<td class="num-center">${c.resultado!=null?fmt0(c.resultado):'—'}</td>`).join('')}</tr>`;
+
+  const resultadoTxt = calc.resultadoFinal!=null ? scoreBadge(calc.resultadoFinal) : `<span class="hint">Pendiente (faltan etapas por calificar)</span>`;
+
+  return `
+    <div>
+      <h3 style="margin:0 0 2px;font-size:13px">Cálculo Nota</h3>
+      <div class="card-sub" style="margin-bottom:8px">Promedio ponderado por participación de familias entre los ${cols.length} programas de esta entidad${!calc.completo ? ' (% recalculado solo entre programas ya evaluados)' : ''}</div>
+      <table class="data compact-cols" style="min-width:0; width:100%; table-layout:fixed">
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="kv-row" style="margin-top:4px"><span class="k"><b>Resultado calificación</b></span><span class="v">${resultadoTxt}</span></div>
+    </div>
+  `;
+}
+
 function openEntidadDetail(rut){
   const e = entidadesList.find(x=>x.rut===rut);
   if (!e) return;
@@ -729,6 +812,7 @@ function openEntidadDetail(rut){
     stageAgg[s] = vals.length ? mean(vals) : null;
   }
   const stageItems = Object.entries(stageAgg).filter(([,v])=>v!=null).map(([k,v])=>({label:stageLabels[k]||('Etapa '+k), value:v}));
+  const calculoNota = computeCalculoNota(e);
 
   pane.innerHTML = `
     <div class="entidad-detail-head">
@@ -747,6 +831,8 @@ function openEntidadDetail(rut){
         <div class="kv-row"><span class="k">Proyectos ejecutados</span><span class="v">${fmt0(e.proyectos)}</span></div>
         <div class="kv-row"><span class="k">Familias beneficiadas</span><span class="v">${fmt0(e.familias)}</span></div>
       </div>
+
+      ${calculoNotaHtml(calculoNota)}
 
       ${(HIST_YEARS.some(y=>e.histYears[y]!=null)||e.avgScoreGlobal!=null) ? `
       <div>
