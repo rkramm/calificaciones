@@ -841,6 +841,14 @@ function loadConfigurationFromSheets() {
             return clave.toLowerCase().trim() === 'fecha_limite';
         });
 
+        // Buscar entrada con clave 'sistema_cerrado'
+        const cierreEntry = config.find(entry => {
+            const clave = entry.clave || entry.Clave || entry.CLAVE || '';
+            return clave.toLowerCase().trim() === 'sistema_cerrado';
+        });
+        const cierreValor = cierreEntry ? (cierreEntry.valor || cierreEntry.Valor || cierreEntry.VALOR || cierreEntry.value || '') : '';
+        updateSistemaCerradoUI(cierreValor.toString().toLowerCase().trim() === 'true');
+
         if (deadlineEntry) {
             const value = deadlineEntry.valor || deadlineEntry.Valor || deadlineEntry.VALOR || deadlineEntry.value;
             if (value) {
@@ -856,6 +864,106 @@ function loadConfigurationFromSheets() {
         }
     }).catch(err => {
         console.warn('⚠️ Error cargando configuración:', err);
+    });
+}
+
+/**
+ * Estado en memoria del flag 'sistema_cerrado' (hoja 'configuracion').
+ * Se actualiza en cada carga de configuración (loadConfigurationFromSheets) y en
+ * cada ciclo del polling de cierre forzado (checkSistemaCerradoFresh).
+ */
+let sistemaCerrado = false;
+
+/**
+ * Refleja el estado de sistema_cerrado en la UI: badge y botones del panel admin,
+ * y alerta + bloqueo de guardado en la vista evaluador (sin pisar el bloqueo por
+ * deadline vencido, que se maneja independientemente en checkDeadlineStatus).
+ */
+function updateSistemaCerradoUI(cerrado) {
+    sistemaCerrado = cerrado;
+
+    const badge = document.getElementById('badge-estado-sistema');
+    if (badge) {
+        badge.textContent = cerrado ? 'CERRADO' : 'ABIERTO';
+        badge.style.background = cerrado ? '#A51D24' : '#2E7D32';
+    }
+    toggleElement('btn-cerrar-sistema', !cerrado);
+    toggleElement('btn-reabrir-sistema', cerrado);
+
+    if (currentRole === 'evaluador') {
+        toggleElement('sistema-cerrado-alert', cerrado);
+        const saveBtn = document.getElementById('btn-save-scores');
+        if (saveBtn) {
+            if (cerrado) {
+                saveBtn.disabled = true;
+            } else if (!deadlineExpired) {
+                saveBtn.disabled = false;
+            }
+        }
+    }
+}
+
+/**
+ * Cierra o reabre el sistema (flag 'sistema_cerrado' en 'configuracion').
+ * Al cerrar, el backend (Code.gs) limpia ACTIVE_SESSIONS de inmediato y rechaza
+ * nuevas escrituras a scores/asignaciones; las sesiones de evaluador ya abiertas
+ * se cierran best-effort vía checkSistemaCerradoFresh (polling ~15s, no hay push).
+ */
+function setSistemaCerrado(cerrado) {
+    const confirmMsg = cerrado
+        ? '🔒 ¿Confirma CERRAR el sistema?\n\nNingún evaluador podrá seguir guardando calificaciones. Las sesiones ya abiertas se cerrarán en un plazo de hasta ~15 segundos.\n\n¿Continuar?'
+        : '🔓 ¿Confirma REABRIR el sistema?\n\nLos evaluadores podrán volver a guardar calificaciones normalmente.\n\n¿Continuar?';
+    if (!confirm(confirmMsg)) return;
+
+    cloudSave('configuracion', [{ clave: 'sistema_cerrado', valor: cerrado ? 'true' : 'false' }], 'incremental').then(result => {
+        if (result && result.success) {
+            updateSistemaCerradoUI(cerrado);
+            alert(cerrado ? '✅ Sistema cerrado correctamente.' : '✅ Sistema reabierto correctamente.');
+        } else {
+            alert('❌ Error al actualizar el estado del sistema. Intente nuevamente.');
+        }
+    }).catch(err => {
+        console.error('Error actualizando sistema_cerrado:', err);
+        alert('❌ Error de conexión al actualizar el estado del sistema.');
+    });
+}
+
+/**
+ * Polling de cierre forzado (~15s): lee 'configuracion' SIEMPRE fresco desde el
+ * servidor (nunca cache local) para detectar si el admin cerró el sistema mientras
+ * esta pestaña de evaluador ya estaba abierta, y forzar su cierre de sesión.
+ * Best-effort: no hay WebSockets/push, así que puede tardar hasta ~15s en aplicarse.
+ */
+let sistemaCerradoPollInterval = null;
+
+function startSistemaCerradoPolling() {
+    if (sistemaCerradoPollInterval) clearInterval(sistemaCerradoPollInterval);
+    sistemaCerradoPollInterval = setInterval(checkSistemaCerradoFresh, 15000);
+}
+
+function stopSistemaCerradoPolling() {
+    if (sistemaCerradoPollInterval) {
+        clearInterval(sistemaCerradoPollInterval);
+        sistemaCerradoPollInterval = null;
+    }
+}
+
+function checkSistemaCerradoFresh() {
+    if (currentRole !== 'evaluador' || !currentUser) return;
+    cloudGet('configuracion').then(config => {
+        if (!config || !Array.isArray(config) || currentRole !== 'evaluador' || !currentUser) return;
+        const entry = config.find(c => {
+            const clave = (c.clave || c.Clave || c.CLAVE || '').toString().toLowerCase().trim();
+            return clave === 'sistema_cerrado';
+        });
+        const cerrado = entry && (entry.valor || entry.Valor || entry.VALOR || '').toString().toLowerCase().trim() === 'true';
+        if (cerrado) {
+            stopSistemaCerradoPolling();
+            alert('🔒 El administrador ha cerrado el sistema de precalificación.\n\nSu sesión se cerrará ahora.');
+            performLogout();
+        }
+    }).catch(() => {
+        // Error de red transitorio: no forzar cierre por un fallo puntual de conexión
     });
 }
 
@@ -2232,6 +2340,8 @@ function setupEventListeners() {
     addManagedListener(document.getElementById('btn-save-asignacion'), 'click', () => { processAsignacionStaging(false); });
     addManagedListener(document.getElementById('btn-save-partial'), 'click', () => { processAsignacionStaging(true); });
     addManagedListener(document.getElementById('btn-save-config'), 'click', saveConfigDeadline);
+    addManagedListener(document.getElementById('btn-cerrar-sistema'), 'click', () => setSistemaCerrado(true));
+    addManagedListener(document.getElementById('btn-reabrir-sistema'), 'click', () => setSistemaCerrado(false));
     addManagedListener(document.getElementById('btn-close-modal'), 'click', closeModal);
     addManagedListener(document.getElementById('chk-toggle-all-stages'), 'change', toggleAllStagesCheckboxes);
     addManagedListener(document.getElementById('btn-modal-cancel'), 'click', closeModal);
@@ -3658,6 +3768,8 @@ function performLogout() {
         }).catch(err => console.warn('⚠️ Error al logout en backend:', err));
     }
 
+    stopSistemaCerradoPolling();
+
     currentUser = null;
     currentRole = null;
     hasUnsavedEvaluatorChanges = false;
@@ -3738,6 +3850,7 @@ function showPanel(titleText) {
         toggleElement('btn-eval-pdf', true);
         checkDeadlineStatus();
         startCountdownClock();
+        startSistemaCerradoPolling();
         renderCoverageTabs();
 
         // Sincronizar datos en background sin bloquear UI

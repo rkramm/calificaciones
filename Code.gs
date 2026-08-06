@@ -424,6 +424,34 @@ function doPost(e) {
       mode = 'replace';
     }
 
+    // Bloqueo de sistema cerrado: rechazar escrituras a scores/asignaciones si el admin
+    // cerró el sistema (flag 'sistema_cerrado' en la hoja 'configuracion'). Verificado
+    // server-side para que no se pueda saltar llamando la API directamente.
+    if ((tableName === 'scores' || tableName === 'asignaciones') && isSistemaCerrado()) {
+      return ContentService.createTextOutput(JSON.stringify({
+        success: false,
+        sistemaCerrado: true,
+        error: 'El sistema de precalificación está cerrado. No es posible guardar cambios.'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Si se está cerrando el sistema (configuracion: sistema_cerrado=true), forzar el
+    // cierre de todas las sesiones activas ya abiertas. Esto es inmediato para el panel
+    // de Sesiones Activas; el cierre forzado del lado del evaluador es best-effort vía
+    // polling en app.js (no hay push/websockets).
+    if (tableName === 'configuracion' && Array.isArray(dataArray)) {
+      const closingEntry = dataArray.find(row => {
+        const clave = (row.clave || row.Clave || row.CLAVE || '').toString().toLowerCase().trim();
+        return clave === 'sistema_cerrado';
+      });
+      if (closingEntry) {
+        const valor = (closingEntry.valor || closingEntry.Valor || closingEntry.VALOR || '').toString().toLowerCase().trim();
+        if (valor === 'true') {
+          PROPERTIES.setProperty('ACTIVE_SESSIONS', '{}');
+        }
+      }
+    }
+
     // Si es solicitud de backup, crear hoja de respaldo y retornar
     if (tableName === '__backup__') {
       const backupName = createBackupSheet();
@@ -612,6 +640,35 @@ function doPost(e) {
   }
 }
 
+/**
+ * Verifica si el sistema está cerrado (flag 'sistema_cerrado' en la hoja 'configuracion').
+ * Lectura directa desde Sheets (no cache), para que el bloqueo de guardado no se pueda
+ * saltar llamando la API directamente con un cliente desactualizado.
+ * Ante cualquier error de lectura, retorna false (fail-open) para no dejar el sistema
+ * completo inutilizable por un problema transitorio de Sheets.
+ */
+function isSistemaCerrado() {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName('configuracion');
+    if (!sheet) return false;
+    const values = sheet.getDataRange().getDisplayValues();
+    if (values.length <= 1) return false;
+    const headers = values[0];
+    const claveIdx = headers.indexOf('clave');
+    const valorIdx = headers.indexOf('valor');
+    if (claveIdx < 0 || valorIdx < 0) return false;
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][claveIdx] === 'sistema_cerrado') {
+        return values[i][valorIdx] === 'true';
+      }
+    }
+    return false;
+  } catch (error) {
+    return false;
+  }
+}
+
 function getKeyField(tableName) {
   const keys = {
     'items': 'id',
@@ -621,7 +678,8 @@ function getKeyField(tableName) {
     'configuracion': 'clave',
     'entidades': 'idEntidad',
     'historicos': 'idHist',
-    'asigna_historico': 'idAsig'
+    'asigna_historico': 'idAsig',
+    'Reunion_calificacion': 'rut'
   };
   return keys[tableName] || 'id';
 }

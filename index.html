@@ -140,6 +140,16 @@
                     <button id="btn-save-config" class="btn btn-primary">Guardar Restricción Temporal</button>
                 </div>
 
+                <div class="card compact-card" id="card-cierre-sistema" style="margin-bottom: 15px; max-width: 500px;" title="Tarjeta de Cierre de Sistema">
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+                        <h3 style="margin: 0;">Cierre de Sistema</h3>
+                        <span id="badge-estado-sistema" style="background:#2E7D32;color:#fff;padding:3px 9px;border-radius:4px;font-size:0.66rem;font-weight:700;letter-spacing:0.03em;">ABIERTO</span>
+                    </div>
+                    <p style="margin-bottom: 10px; font-size: 0.85rem; color: #666;">Cierra el sistema para que ningún evaluador pueda seguir calificando (útil antes de presentar resultados). Reversible en cualquier momento. El cierre de sesiones ya abiertas es best-effort: puede tardar hasta ~15 segundos en aplicarse en pestañas que ya estaban abiertas.</p>
+                    <button id="btn-cerrar-sistema" class="btn btn-primary" style="background-color: #A51D24; border-color: #A51D24; color: #FFF;">🔒 Cerrar Sistema</button>
+                    <button id="btn-reabrir-sistema" class="btn btn-primary hidden" style="background-color: #2E7D32; border-color: #2E7D32; color: #FFF;">🔓 Reabrir Sistema</button>
+                </div>
+
                 <div class="card compact-card" style="margin-bottom: 15px;" title="Tarjeta de Respaldo de Datos">
                     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
                         <h3 style="margin: 0;">Respaldo y Security de Datos</h3>
@@ -455,6 +465,10 @@
 
             <div id="deadline-alert" class="card hidden" style="background-color: #FCE8E6; border-left: 5px solid var(--accent-red); color: #A51D24; font-weight: bold; padding:8px 12px; margin: 0; border-radius: 0;">
                 El periodo de evaluación ha vencido. El sistema se encuentra en modo de solo lectura.
+            </div>
+
+            <div id="sistema-cerrado-alert" class="card hidden" style="background-color: #FCE8E6; border-left: 5px solid var(--accent-red); color: #A51D24; font-weight: bold; padding:8px 12px; margin: 0; border-radius: 0;">
+                🔒 El administrador ha cerrado el sistema de precalificación. No es posible guardar cambios.
             </div>
 
             <div id="eval-progress-bar" class="hidden" style="background: linear-gradient(90deg, var(--primary-dark) 0%, var(--primary-blue) 50%, var(--primary-dark) 100%); background-size: 200% 100%; animation: progress-animation 1.5s ease-in-out infinite; margin: 0; padding: 0;"></div>
