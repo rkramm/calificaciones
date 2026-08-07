@@ -279,7 +279,9 @@ function refreshOpenCommentTargets(){
 }
 async function saveComentario(rut, nombreEntidad, calificacion, comentario){
   const trimmed = (comentario||'').trim();
-  const calif = calificacion !== '' && calificacion != null && !isNaN(calificacion) ? Math.round(calificacion) : '';
+  let calif = calificacion !== '' && calificacion != null && !isNaN(calificacion) ? Math.round(calificacion) : '';
+  if (calif !== '') calif = Math.min(100, Math.max(0, calif));
+  const previous = comentariosMap.get(rut);
   if (!trimmed && calif === '') {
     comentariosMap.delete(rut);
   } else {
@@ -289,15 +291,20 @@ async function saveComentario(rut, nombreEntidad, calificacion, comentario){
     rut, nombreEntidad, calificacion: calif, comentario: trimmed
   }], 'incremental');
   if (!result || !result.success) {
+    if (previous) comentariosMap.set(rut, previous); else comentariosMap.delete(rut);
+    refreshOpenCommentTargets();
     alert('⚠️ No se pudo guardar el comentario en el servidor. Intente nuevamente.');
   }
 }
 async function deleteComentario(rut){
+  const previous = comentariosMap.get(rut);
   comentariosMap.delete(rut);
   // Borrado real: la fila con este rut se elimina físicamente de Reunion_calificacion
   // (mismo mecanismo deleteKeys que usa el calificador para borrar notas de scores).
   const result = await cloudSave('Reunion_calificacion', [], 'incremental', { deleteKeys: [rut] });
   if (!result || !result.success) {
+    if (previous) comentariosMap.set(rut, previous);
+    refreshOpenCommentTargets();
     alert('⚠️ No se pudo confirmar el borrado en el servidor.');
   }
 }
@@ -368,7 +375,10 @@ function rebuildData(){
     const n = normName(nombre);
     if (rutPorNombre.has(n)) return rutPorNombre.get(n);
     for (const [k,v] of rutPorNombre.entries()){
-      if (k.startsWith(n.slice(0,18)) || n.startsWith(k.slice(0,18))) return v;
+      if (k.startsWith(n.slice(0,18)) || n.startsWith(k.slice(0,18))) {
+        console.warn('findRutByName: match aproximado (no exacto) para "' + nombre + '" -> rut ' + v + '. Verificar si corresponde a la entidad correcta.');
+        return v;
+      }
     }
     return null;
   }
@@ -456,7 +466,10 @@ function rebuildData(){
     const n = normName(nombre);
     if (proyectosPorEntidad.has(n)) return proyectosPorEntidad.get(n);
     for (const [k,v] of proyectosPorEntidad.entries()){
-      if (k.startsWith(n.slice(0,18)) || n.startsWith(k.slice(0,18))) return v;
+      if (k.startsWith(n.slice(0,18)) || n.startsWith(k.slice(0,18))) {
+        console.warn('findProyectos: match aproximado (no exacto) para "' + nombre + '". Verificar si corresponde a la entidad correcta.');
+        return v;
+      }
     }
     return null;
   }
@@ -846,9 +859,11 @@ function calculoNotaHtml(calc, e){
     <div>
       <h3 style="margin:0 0 2px;font-size:13px">Cálculo Nota</h3>
       <div class="card-sub" style="margin-bottom:8px">Promedio ponderado por participación de familias entre los ${cols.length} programas de esta entidad${!calc.completo ? ' (% recalculado solo entre programas ya evaluados)' : ''}</div>
+      <div class="card-scroll">
       <table class="data compact-cols" style="min-width:0; width:100%; table-layout:fixed">
         <tbody>${rows}</tbody>
       </table>
+      </div>
       <div class="kv-row" style="margin-top:4px"><span class="k">Resultado automático</span><span class="v">${autoTxt}</span></div>
       <div class="kv-row" style="margin-top:4px">
         <span class="k">Nota final (comisión)</span>
@@ -884,7 +899,7 @@ function openEntidadDetail(rut){
     <div class="entidad-detail-head">
       <button class="close" id="entidad-detail-close">Cerrar ✕</button>
       <h2>${esc(e.nombre)}</h2>
-      <div class="meta">RUT ${esc(e.rut)} · ${e.provincias.join(', ')}</div>
+      <div class="meta">RUT ${esc(e.rut)} · ${esc(e.provincias.join(', '))}</div>
     </div>
     <div class="entidad-detail-body">
       <div>
@@ -915,6 +930,7 @@ function openEntidadDetail(rut){
       <div>
         <h3 style="margin:0 0 2px;font-size:13px">Calificación por programa y provincia</h3>
         <div class="card-sub" style="margin-bottom:8px">Resumen; el detalle por ítem se muestra abajo, por cobertura</div>
+        <div class="card-scroll">
         <table class="data" style="min-width:0; width:100%; table-layout:fixed">
           <colgroup><col style="width:22%"><col style="width:22%"><col style="width:14%"><col style="width:18%"><col style="width:24%"></colgroup>
           <thead><tr><th>Programa</th><th>Provincia</th><th>Ítems</th><th>Evaluad.</th><th>Puntaje</th></tr></thead>
@@ -926,6 +942,7 @@ function openEntidadDetail(rut){
             <td><span class="v">${scoreBadge(c.avgScore)}</span></td>
           </tr>`).join('')}
         </tbody></table>
+        </div>
       </div>
 
       <div>
@@ -1186,19 +1203,36 @@ async function boot(){
     const btn = e.target.closest('button[data-view]');
     if (btn) setView(btn.dataset.view);
   });
+  let loadingData = false;
   $('#btn-refresh-data').addEventListener('click', async () => {
+    if (loadingData) return;
+    loadingData = true;
+    $('#btn-refresh-data').disabled = true;
     $('#data-status').textContent = 'Recargando…';
-    await loadAllData();
-    rebuildData();
-    $('#data-status').textContent = 'Datos actualizados';
-    RENDERERS[state.view]();
+    try {
+      await loadAllData();
+      rebuildData();
+      $('#data-status').textContent = 'Datos actualizados';
+      RENDERERS[state.view]();
+    } catch (err) {
+      console.error('Error al recargar datos:', err);
+      $('#data-status').textContent = 'Error al recargar. Intente nuevamente.';
+    } finally {
+      loadingData = false;
+      $('#btn-refresh-data').disabled = false;
+    }
   });
 
   $('#data-status').textContent = 'Cargando datos…';
-  await loadAllData();
-  rebuildData();
-  $('#data-status').textContent = 'Datos cargados';
-  setView('entidades');
+  try {
+    await loadAllData();
+    rebuildData();
+    $('#data-status').textContent = 'Datos cargados';
+    setView('entidades');
+  } catch (err) {
+    console.error('Error al cargar datos:', err);
+    $('#data-status').textContent = 'Error al cargar datos. Recargue la página.';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', initLogin);
