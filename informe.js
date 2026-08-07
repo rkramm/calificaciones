@@ -21,6 +21,30 @@ const fmt0 = n => n==null || isNaN(n) ? '—' : Math.round(n).toLocaleString('es
 const mean = arr => arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : null;
 const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+/**
+ * Promedio JERÁRQUICO (no promedio simple de todos los ítems juntos):
+ * primero se promedian los ítems de CADA evaluador por separado, y luego se
+ * promedian esos promedios entre sí - cada evaluador pesa igual, sin
+ * importar cuántos ítems haya calificado. Así es como se calcula
+ * oficialmente la nota (verificado contra un ejemplo real con datos reales
+ * de un evaluador que calificó solo 1 ítem de una etapa vs. otros que
+ * calificaron varios - ese evaluador de 1 ítem debe pesar igual que los
+ * demás, no aportar menos por tener menos ítems).
+ * @param {Array<{score:number, evaluadorRut?:string, evaluador?:string}>} items
+ * @returns {number|null}
+ */
+function hierarchicalMean(items){
+  if (!items.length) return null;
+  const byEvaluador = {};
+  items.forEach(it => {
+    const key = it.evaluadorRut || it.evaluador || '(sin evaluador)';
+    if (!byEvaluador[key]) byEvaluador[key] = [];
+    byEvaluador[key].push(it.score);
+  });
+  const groupAverages = Object.values(byEvaluador).map(arr => mean(arr));
+  return groupAverages.length ? mean(groupAverages) : null;
+}
+
 function normName(s){
   return (s||'').toString().trim().toUpperCase()
     .normalize('NFD').replace(/[̀-ͯ]/g,'')
@@ -359,7 +383,7 @@ function rebuildData(){
     if (!coberturas.has(key)) {
       coberturas.set(key, {
         key, nombre: nombre.toString().trim(), programa: (programa||'').toString().trim(), provincia: provD,
-        scores: [], evaluadores: new Set(), stageScores: {1:[],2:[],3:[],4:[],5:[],6:[]}, items: [],
+        scores: [], evaluadores: new Set(), items: [],
       });
     }
     return coberturas.get(key);
@@ -371,8 +395,7 @@ function rebuildData(){
     const s = Number(r.score);
     if (!isNaN(s)) {
       c.scores.push(s);
-      if (r.stage && c.stageScores[r.stage]) c.stageScores[r.stage].push(s);
-      c.items.push({ itemId: r.itemId, stage: r.stage, score: s, evaluador: r.nombreEvaluador, hora: r.hora });
+      c.items.push({ itemId: r.itemId, stage: r.stage, score: s, evaluador: r.nombreEvaluador, evaluadorRut: r.rutEvaluador, hora: r.hora });
     }
     if (r.rutEvaluador) c.evaluadores.add(r.rutEvaluador);
   });
@@ -383,9 +406,15 @@ function rebuildData(){
   });
 
   coberturas.forEach(c => {
-    c.avgScore = c.scores.length ? mean(c.scores) : null;
+    // Promedio jerárquico (por evaluador, luego por etapa, luego global de la
+    // cobertura) - NO es un promedio simple de todos los ítems juntos. Ver
+    // hierarchicalMean() para el detalle y por qué es así.
     c.stageAvg = {};
-    for (let s=1; s<=6; s++) c.stageAvg[s] = c.stageScores[s].length ? mean(c.stageScores[s]) : null;
+    for (let s=1; s<=6; s++) {
+      c.stageAvg[s] = hierarchicalMean(c.items.filter(it => it.stage == s));
+    }
+    const validStageAvgs = Object.values(c.stageAvg).filter(v => v != null);
+    c.avgScore = validStageAvgs.length ? mean(validStageAvgs) : null;
     c.rut = findRutByName(c.nombre);
   });
 
@@ -753,8 +782,8 @@ function computeCalculoNota(e){
 
   const porPrograma = {};
   e.coberturas.forEach(c => {
-    if (!porPrograma[c.programa]) porPrograma[c.programa] = { stageScores: {1:[],2:[],3:[],4:[],5:[],6:[]} };
-    for (let s=1; s<=6; s++) porPrograma[c.programa].stageScores[s].push(...c.stageScores[s]);
+    if (!porPrograma[c.programa]) porPrograma[c.programa] = { items: [] };
+    porPrograma[c.programa].items.push(...c.items);
   });
 
   const programasPresentes = Object.keys(porPrograma).sort((a,b)=>PROGRAMA_ORDER.indexOf(a)-PROGRAMA_ORDER.indexOf(b));
@@ -763,8 +792,7 @@ function computeCalculoNota(e){
   const columnas = programasPresentes.map(p => {
     const stageAvgs = {};
     for (let s=1; s<=6; s++) {
-      const vals = porPrograma[p].stageScores[s];
-      stageAvgs[s] = vals.length ? mean(vals) : null;
+      stageAvgs[s] = hierarchicalMean(porPrograma[p].items.filter(it => it.stage == s));
     }
     const nonNull = Object.values(stageAvgs).filter(v=>v!=null);
     const resultado = nonNull.length ? mean(nonNull) : null;
@@ -846,8 +874,8 @@ function openEntidadDetail(rut){
   const stageLabels = {2: '2 · ' + RUBRICA_ETAPAS[2].nombre};
   const stageAgg = {};
   for (let s=1;s<=6;s++){
-    const vals = e.coberturas.flatMap(c=>c.stageScores[s]);
-    stageAgg[s] = vals.length ? mean(vals) : null;
+    const items = e.coberturas.flatMap(c=>c.items).filter(it => it.stage == s);
+    stageAgg[s] = hierarchicalMean(items);
   }
   const stageItems = Object.entries(stageAgg).filter(([,v])=>v!=null).map(([k,v])=>({label:stageLabels[k]||('Etapa '+k), value:v}));
   const calculoNota = computeCalculoNota(e);
@@ -973,7 +1001,7 @@ function renderCoberturaItems(holder, cobertura){
       const byItem = {};
       byStage[st].forEach(it => { const k = String(it.itemId); (byItem[k] = byItem[k] || []).push(it); });
       const itemIds = Object.keys(byItem).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
-      const stageAvg = mean(byStage[st].map(it=>it.score));
+      const stageAvg = hierarchicalMean(byStage[st]);
       const rows = itemIds.map(id => {
         const entries = byItem[id];
         const avg = mean(entries.map(x=>x.score));
