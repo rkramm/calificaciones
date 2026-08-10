@@ -22,27 +22,29 @@ const mean = arr => arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : null;
 const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 /**
- * Promedio JERÁRQUICO (no promedio simple de todos los ítems juntos):
- * primero se promedian los ítems de CADA evaluador por separado, y luego se
- * promedian esos promedios entre sí - cada evaluador pesa igual, sin
- * importar cuántos ítems haya calificado. Así es como se calcula
- * oficialmente la nota (verificado contra un ejemplo real con datos reales
- * de un evaluador que calificó solo 1 ítem de una etapa vs. otros que
- * calificaron varios - ese evaluador de 1 ítem debe pesar igual que los
- * demás, no aportar menos por tener menos ítems).
- * @param {Array<{score:number, evaluadorRut?:string, evaluador?:string}>} items
+ * Promedio POR ÍTEM (no por evaluador): cuando más de un evaluador califica
+ * el mismo ítem (código de rúbrica, ej. "4.7"), esas notas se promedian
+ * primero y ESE promedio (redondeado a entero) queda como "la nota" oficial
+ * de ese ítem - es un doble-chequeo/validación cruzada entre áreas, no dos
+ * mediciones independientes. Luego se promedian las notas de todos los
+ * ítems distintos de la etapa para obtener el promedio de la etapa.
+ * Verificado ítem por ítem contra los subtotales reales de Excel del
+ * usuario (Etapa 5, entidad VIGO): 92, 97, 95, 98, 88, 98, 100 → 95,43,
+ * que solo se reproduce redondeando cada ítem ANTES de promediar entre
+ * ítems (el promedio sin redondeo intermedio da 95,36, que no calza).
+ * @param {Array<{score:number, itemId:string|number}>} items
  * @returns {number|null}
  */
-function hierarchicalMean(items){
+function itemMean(items){
   if (!items.length) return null;
-  const byEvaluador = {};
+  const byItem = {};
   items.forEach(it => {
-    const key = it.evaluadorRut || it.evaluador || '(sin evaluador)';
-    if (!byEvaluador[key]) byEvaluador[key] = [];
-    byEvaluador[key].push(it.score);
+    const key = String(it.itemId);
+    if (!byItem[key]) byItem[key] = [];
+    byItem[key].push(it.score);
   });
-  const groupAverages = Object.values(byEvaluador).map(arr => mean(arr));
-  return groupAverages.length ? mean(groupAverages) : null;
+  const itemAverages = Object.values(byItem).map(arr => Math.round(mean(arr)));
+  return itemAverages.length ? mean(itemAverages) : null;
 }
 
 function normName(s){
@@ -416,12 +418,12 @@ function rebuildData(){
   });
 
   coberturas.forEach(c => {
-    // Promedio jerárquico (por evaluador, luego por etapa, luego global de la
-    // cobertura) - NO es un promedio simple de todos los ítems juntos. Ver
-    // hierarchicalMean() para el detalle y por qué es así.
+    // Promedio por ítem (luego entre ítems distintos de la etapa) - NO es un
+    // promedio simple de todos los puntajes juntos ni por evaluador. Ver
+    // itemMean() para el detalle y por qué es así.
     c.stageAvg = {};
     for (let s=1; s<=6; s++) {
-      c.stageAvg[s] = hierarchicalMean(c.items.filter(it => it.stage == s));
+      c.stageAvg[s] = itemMean(c.items.filter(it => it.stage == s));
     }
     const validStageAvgs = Object.values(c.stageAvg).filter(v => v != null);
     c.avgScore = validStageAvgs.length ? mean(validStageAvgs) : null;
@@ -865,8 +867,9 @@ function openEvaluacionDetail(rut){
 
   const pane = $('#evaluacion-detail-pane');
   const proyDetalle = e.proyectosDetalle || {DS49:[],DS27:[],DS10:[]};
+  const itemsPorProgramaList = []; // para renderCoberturaItems() después de pintar el HTML
 
-  const programaBlocks = e.programas.map(p => {
+  const programaBlocks = e.programas.map((p, pIdx) => {
     const proyectos = proyDetalle[p] || [];
     const totalFamilias = proyectos.reduce((s,x)=>s+(x.familias||0),0);
     const proyectosHtml = proyectos.length ? `
@@ -882,22 +885,14 @@ function openEvaluacionDetail(rut){
       </div>
     ` : `<div class="hint">Sin proyectos registrados para este programa.</div>`;
 
-    // Calificadores y etapas: unión de todas las coberturas (provincias) de este programa
+    // Calificadores: unión de todas las coberturas (provincias) de este programa
     const cobsPrograma = e.coberturas.filter(c => c.programa === p);
     const itemsPrograma = cobsPrograma.flatMap(c => c.items);
     const evaluadoresMap = new Map(); // rut -> nombre
-    const etapasSet = new Set();
     itemsPrograma.forEach(it => {
       if (it.evaluadorRut) evaluadoresMap.set(it.evaluadorRut, it.evaluador || '');
-      if (it.stage != null) etapasSet.add(Number(it.stage));
     });
     const evaluadoresList = Array.from(evaluadoresMap.entries()).sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
-    // Promedio jerárquico por etapa (por evaluador, luego entre evaluadores) -
-    // mismo método que hierarchicalMean() usa en el resto del informe.
-    const etapasList = Array.from(etapasSet).sort((a,b)=>a-b).map(s => ({
-      stage: s,
-      promedio: hierarchicalMean(itemsPrograma.filter(it => Number(it.stage) === s)),
-    }));
 
     const calificadoresHtml = evaluadoresList.length ? `
       <div class="card-scroll">
@@ -911,17 +906,7 @@ function openEvaluacionDetail(rut){
       </div>
     ` : `<div class="hint">Sin evaluadores registrados.</div>`;
 
-    const etapasHtml = etapasList.length ? `
-      <div class="card-scroll">
-      <table class="data compact-cols" style="min-width:0; width:100%; table-layout:fixed">
-        <colgroup><col style="width:60%"><col style="width:40%"></colgroup>
-        <thead><tr><th>Etapa</th><th class="num-center">Promedio</th></tr></thead>
-        <tbody>
-          ${etapasList.map(x=>`<tr><td>${x.stage===2?'Etapa 2 · '+esc(RUBRICA_ETAPAS[2].nombre):'Etapa '+x.stage}</td><td class="num-center">${x.promedio!=null?fmt0(x.promedio):'—'}</td></tr>`).join('')}
-        </tbody>
-      </table>
-      </div>
-    ` : `<div class="hint">Sin etapas calificadas todavía.</div>`;
+    itemsPorProgramaList.push(itemsPrograma);
 
     return `
       <div class="rubric-card" style="margin-bottom:12px">
@@ -936,7 +921,7 @@ function openEvaluacionDetail(rut){
         </div>
         <div class="rubric-desc" style="border-bottom:none">
           <h4 style="margin:0 0 6px;font-size:12.5px;color:var(--text-primary)">Etapas calificadas</h4>
-          ${etapasHtml}
+          <div id="eval-items-${pIdx}"></div>
         </div>
       </div>
     `;
@@ -954,6 +939,10 @@ function openEvaluacionDetail(rut){
   `;
   $('#evaluacion-detail-close').addEventListener('click', closeEvaluacionDetail);
   $('#evaluacion-split').classList.add('detail-open');
+  itemsPorProgramaList.forEach((items, i) => {
+    const holder = $(`#eval-items-${i}`);
+    if (holder) renderCoberturaItems(holder, { items });
+  });
 }
 function closeEvaluacionDetail(){
   selectedEvalRut = null;
@@ -988,7 +977,7 @@ function computeCalculoNota(e){
   const columnas = programasPresentes.map(p => {
     const stageAvgs = {};
     for (let s=1; s<=6; s++) {
-      stageAvgs[s] = hierarchicalMean(porPrograma[p].items.filter(it => it.stage == s));
+      stageAvgs[s] = itemMean(porPrograma[p].items.filter(it => it.stage == s));
     }
     const nonNull = Object.values(stageAvgs).filter(v=>v!=null);
     const resultado = nonNull.length ? mean(nonNull) : null;
@@ -1073,7 +1062,7 @@ function openEntidadDetail(rut){
   const stageAgg = {};
   for (let s=1;s<=6;s++){
     const items = e.coberturas.flatMap(c=>c.items).filter(it => it.stage == s);
-    stageAgg[s] = hierarchicalMean(items);
+    stageAgg[s] = itemMean(items);
   }
   const stageItems = Object.entries(stageAgg).filter(([,v])=>v!=null).map(([k,v])=>({label:stageLabels[k]||('Etapa '+k), value:v}));
   const calculoNota = computeCalculoNota(e);
@@ -1201,7 +1190,7 @@ function renderCoberturaItems(holder, cobertura){
       const byItem = {};
       byStage[st].forEach(it => { const k = String(it.itemId); (byItem[k] = byItem[k] || []).push(it); });
       const itemIds = Object.keys(byItem).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
-      const stageAvg = hierarchicalMean(byStage[st]);
+      const stageAvg = itemMean(byStage[st]);
       const rows = itemIds.map(id => {
         const entries = byItem[id];
         const avg = mean(entries.map(x=>x.score));
