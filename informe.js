@@ -884,16 +884,44 @@ function openEvaluacionDetail(rut){
 
     // Calificadores y etapas: unión de todas las coberturas (provincias) de este programa
     const cobsPrograma = e.coberturas.filter(c => c.programa === p);
+    const itemsPrograma = cobsPrograma.flatMap(c => c.items);
     const evaluadoresMap = new Map(); // rut -> nombre
     const etapasSet = new Set();
-    cobsPrograma.forEach(c => {
-      c.items.forEach(it => {
-        if (it.evaluadorRut) evaluadoresMap.set(it.evaluadorRut, it.evaluador || '');
-        if (it.stage != null) etapasSet.add(Number(it.stage));
-      });
+    itemsPrograma.forEach(it => {
+      if (it.evaluadorRut) evaluadoresMap.set(it.evaluadorRut, it.evaluador || '');
+      if (it.stage != null) etapasSet.add(Number(it.stage));
     });
     const evaluadoresList = Array.from(evaluadoresMap.entries()).sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
-    const etapasList = Array.from(etapasSet).sort((a,b)=>a-b);
+    // Promedio jerárquico por etapa (por evaluador, luego entre evaluadores) -
+    // mismo método que hierarchicalMean() usa en el resto del informe.
+    const etapasList = Array.from(etapasSet).sort((a,b)=>a-b).map(s => ({
+      stage: s,
+      promedio: hierarchicalMean(itemsPrograma.filter(it => Number(it.stage) === s)),
+    }));
+
+    const calificadoresHtml = evaluadoresList.length ? `
+      <div class="card-scroll">
+      <table class="data compact-cols" style="min-width:0; width:100%; table-layout:fixed">
+        <colgroup><col style="width:65%"><col style="width:35%"></colgroup>
+        <thead><tr><th>Calificador</th><th>RUT</th></tr></thead>
+        <tbody>
+          ${evaluadoresList.map(([rut,nombre])=>`<tr><td class="wrap-name">${esc(nombre||'(sin nombre)')}</td><td>${esc(rut)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      </div>
+    ` : `<div class="hint">Sin evaluadores registrados.</div>`;
+
+    const etapasHtml = etapasList.length ? `
+      <div class="card-scroll">
+      <table class="data compact-cols" style="min-width:0; width:100%; table-layout:fixed">
+        <colgroup><col style="width:60%"><col style="width:40%"></colgroup>
+        <thead><tr><th>Etapa</th><th class="num-center">Promedio</th></tr></thead>
+        <tbody>
+          ${etapasList.map(x=>`<tr><td>${x.stage===2?'Etapa 2 · '+esc(RUBRICA_ETAPAS[2].nombre):'Etapa '+x.stage}</td><td class="num-center">${x.promedio!=null?fmt0(x.promedio):'—'}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      </div>
+    ` : `<div class="hint">Sin etapas calificadas todavía.</div>`;
 
     return `
       <div class="rubric-card" style="margin-bottom:12px">
@@ -904,11 +932,11 @@ function openEvaluacionDetail(rut){
         </div>
         <div class="rubric-desc" style="background:var(--surface-1); border-bottom:1px solid var(--border)">
           <h4 style="margin:0 0 6px;font-size:12.5px;color:var(--text-primary)">Calificadores (${evaluadoresList.length})</h4>
-          ${evaluadoresList.length ? `<div class="taglist">${evaluadoresList.map(([rut,nombre])=>`<span class="pill">${esc(nombre||'(sin nombre)')} · ${esc(rut)}</span>`).join('')}</div>` : `<div class="hint">Sin evaluadores registrados.</div>`}
+          ${calificadoresHtml}
         </div>
         <div class="rubric-desc" style="border-bottom:none">
           <h4 style="margin:0 0 6px;font-size:12.5px;color:var(--text-primary)">Etapas calificadas</h4>
-          ${etapasList.length ? `<div class="taglist">${etapasList.map(s=>`<span class="pill">Etapa ${s}</span>`).join('')}</div>` : `<div class="hint">Sin etapas calificadas todavía.</div>`}
+          ${etapasHtml}
         </div>
       </div>
     `;
