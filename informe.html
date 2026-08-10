@@ -221,7 +221,13 @@
   .rubric-legend-item { display: inline-flex; align-items: center; gap: 5px; }
   .rubric-legend-item .dot { width: 8px; height: 8px; border-radius: 50%; }
   .rubric-card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface-1); }
-  .rubric-header { background: var(--series-1); color: #fff; padding: 8px 12px; font-size: 12.5px; font-weight: 700; }
+  .rubric-header { background: var(--series-1); color: #fff; padding: 8px 12px; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .rubric-copy-btn {
+    all: unset; cursor: pointer; font-size: 10.5px; font-weight: 650; flex: 0 0 auto; white-space: nowrap;
+    color: #fff; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35);
+    border-radius: 6px; padding: 3px 8px;
+  }
+  .rubric-copy-btn:hover { background: rgba(255,255,255,.3); }
   .rubric-desc { padding: 7px 12px; font-size: 11px; color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); line-height: 1.4; }
   .rubric-rows { display: flex; flex-direction: column; }
   .rubric-row {
@@ -414,6 +420,6 @@
 <script src="config.default.js"></script>
 <script src="config.js" onerror="console.log('config.js no encontrado, usando config.default.js')"></script>
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="informe.js?v=20260808b"></script>
+<script src="informe.js?v=20260808c"></script>
 </body>
 </html>

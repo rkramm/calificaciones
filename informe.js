@@ -1218,6 +1218,7 @@ function renderCoberturaItems(holder, cobertura){
     holder.innerHTML = `<div class="hint">Sin ítems calificados para esta cobertura.</div>`;
     return;
   }
+  const copyValuesByStage = {}; // stage -> valores en el orden oficial de la rúbrica ('' si el ítem no fue calificado)
   holder.innerHTML = `<div class="rubric-legend">
       <span class="rubric-legend-item"><span class="dot" style="background:var(--critical)"></span>0–49 Bajo</span>
       <span class="rubric-legend-item"><span class="dot" style="background:var(--warning)"></span>50–79 Aceptable</span>
@@ -1239,8 +1240,19 @@ function renderCoberturaItems(holder, cobertura){
           <div class="rubric-score" style="${rubricScoreStyle(avg)}">${fmt0(avg)}</div>
         </div>`;
       }).join('');
+
+      // Orden "oficial" de ítems según el catálogo de la rúbrica (RUBRICA_ETAPAS),
+      // no solo los que tienen puntaje - así, al copiar para pegar en otro
+      // sistema, un ítem sin calificar queda en blanco pero no desalinea el
+      // orden de los que vienen después.
+      const officialIds = rubrica && rubrica.items ? Object.keys(rubrica.items) : itemIds;
+      copyValuesByStage[st] = officialIds.map(id => byItem[id] ? fmt0(mean(byItem[id].map(x=>x.score))) : '');
+
       return `<div class="rubric-card">
-        <div class="rubric-header"><div>${esc(rubrica && rubrica.nombre ? rubrica.nombre : ('Etapa ' + st))}</div></div>
+        <div class="rubric-header">
+          <div>${esc(rubrica && rubrica.nombre ? rubrica.nombre : ('Etapa ' + st))}</div>
+          <button type="button" class="rubric-copy-btn" data-stage="${esc(st)}" title="Copiar los valores de esta etapa, en orden, para pegar en otro sistema">Copiar valores</button>
+        </div>
         ${rubrica && rubrica.descripcion ? `<div class="rubric-desc">Comprende: ${esc(rubrica.descripcion)}</div>` : ''}
         <div class="rubric-rows">${rows}</div>
         <div class="rubric-footer">
@@ -1252,6 +1264,21 @@ function renderCoberturaItems(holder, cobertura){
   $$('.rubric-row[data-tt]', holder).forEach(row => {
     row.addEventListener('mousemove', ev => showTooltip(ev, row.dataset.tt));
     row.addEventListener('mouseleave', hideTooltip);
+  });
+  $$('.rubric-copy-btn', holder).forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const vals = copyValuesByStage[btn.dataset.stage] || [];
+      const text = vals.join('\n');
+      const original = btn.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Copiado ✓';
+      } catch (err) {
+        alert('No se pudo copiar al portapapeles. Copia manualmente:\n\n' + text);
+        return;
+      }
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    });
   });
 }
 function closeEntidadDetail(){
