@@ -234,7 +234,10 @@ async function loadAllData(){
    4. Comentarios de consenso — SOLO por entidad (no por cobertura/programa),
    guardados en la hoja 'Reunion_calificacion' (clave primaria: rut).
    ====================================================================== */
-let comentariosMap = new Map(); // rut -> { nombreEntidad, calificacion, comentario }
+let comentariosMap = new Map(); // rut -> { nombreEntidad, calificacion, comentario, ingresado }
+function parseBool(v){
+  return v === true || v === 'true' || v === 'TRUE' || v === '1' || v === 1;
+}
 function loadComentariosFromRows(rows){
   comentariosMap = new Map();
   rows.forEach(r => {
@@ -244,6 +247,7 @@ function loadComentariosFromRows(rows){
       nombreEntidad: r.nombreEntidad || '',
       calificacion: r.calificacion !== undefined && r.calificacion !== '' ? parseFloat(r.calificacion) : null,
       comentario: r.comentario || '',
+      ingresado: parseBool(r.ingresado),
     });
   });
 }
@@ -284,13 +288,14 @@ async function saveComentario(rut, nombreEntidad, calificacion, comentario){
   let calif = calificacion !== '' && calificacion != null && !isNaN(calificacion) ? Math.round(calificacion) : '';
   if (calif !== '') calif = Math.min(100, Math.max(0, calif));
   const previous = comentariosMap.get(rut);
-  if (!trimmed && calif === '') {
+  const ingresado = previous ? !!previous.ingresado : false; // no perder el estado "Ingresado a sistema" al guardar un comentario
+  if (!trimmed && calif === '' && !ingresado) {
     comentariosMap.delete(rut);
   } else {
-    comentariosMap.set(rut, { nombreEntidad, calificacion: calif === '' ? null : calif, comentario: trimmed });
+    comentariosMap.set(rut, { nombreEntidad, calificacion: calif === '' ? null : calif, comentario: trimmed, ingresado });
   }
   const result = await cloudSave('Reunion_calificacion', [{
-    rut, nombreEntidad, calificacion: calif, comentario: trimmed
+    rut, nombreEntidad, calificacion: calif, comentario: trimmed, ingresado
   }], 'incremental');
   if (!result || !result.success) {
     if (previous) comentariosMap.set(rut, previous); else comentariosMap.delete(rut);
@@ -308,6 +313,30 @@ async function deleteComentario(rut){
     if (previous) comentariosMap.set(rut, previous);
     refreshOpenCommentTargets();
     alert('⚠️ No se pudo confirmar el borrado en el servidor.');
+  }
+}
+/**
+ * Marca/desmarca "Ingresado a sistema" para una entidad (checkbox en el
+ * detalle de "Detalle Evaluación"). Se guarda en la misma fila de
+ * Reunion_calificacion (clave: rut) que la calificación/comentario de
+ * consenso, preservando esos valores si ya existían.
+ */
+async function toggleIngresado(rut, nombreEntidad, checkboxEl){
+  const previous = comentariosMap.get(rut);
+  const nuevoIngresado = !(previous && previous.ingresado);
+  const calificacion = previous && previous.calificacion != null ? previous.calificacion : '';
+  const comentario = previous ? previous.comentario : '';
+  comentariosMap.set(rut, { nombreEntidad, calificacion: calificacion === '' ? null : calificacion, comentario: comentario || '', ingresado: nuevoIngresado });
+  if (checkboxEl) checkboxEl.checked = nuevoIngresado;
+  paintEvaluacionTable();
+  const result = await cloudSave('Reunion_calificacion', [{
+    rut, nombreEntidad, calificacion, comentario: comentario || '', ingresado: nuevoIngresado
+  }], 'incremental');
+  if (!result || !result.success) {
+    if (previous) comentariosMap.set(rut, previous); else comentariosMap.delete(rut);
+    if (checkboxEl) checkboxEl.checked = !!(previous && previous.ingresado);
+    paintEvaluacionTable();
+    alert('⚠️ No se pudo guardar "Ingresado a sistema" en el servidor. Intente nuevamente.');
   }
 }
 function initCommentModal(){
@@ -852,7 +881,7 @@ function paintEvaluacionTable(){
   const tbody = $('#tbl-evaluacion tbody');
   tbody.innerHTML = list.map(e => `
     <tr data-rut="${esc(e.rut)}" class="${e.rut===selectedEvalRut?'selected':''}">
-      <td><div class="wrap-name">${esc(e.nombre)}</div></td>
+      <td><div class="wrap-name">${esc(e.nombre)}${comentariosMap.get(e.rut)?.ingresado ? ' <span class="badge good" title="Ingresado a sistema"><span class="dot" style="background:var(--good)"></span>OK</span>' : ''}</div></td>
       <td class="num-center">${e.programas.map(p=>`<span class="pill"><span class="dot" style="background:${PROGRAMA_COLOR[p]}"></span>${esc(p)}</span>`).join(' ')}</td>
       <td class="num-center">${fmt0(e.numEvaluadores)}</td>
     </tr>
@@ -927,11 +956,16 @@ function openEvaluacionDetail(rut){
     `;
   }).join('');
 
+  const yaIngresado = !!comentariosMap.get(e.rut)?.ingresado;
   pane.innerHTML = `
     <div class="entidad-detail-head">
       <button class="close" id="evaluacion-detail-close">Cerrar ✕</button>
       <h2>${esc(e.nombre)}</h2>
       <div class="meta">RUT ${esc(e.rut)} · ${esc(e.provincias.join(', '))}</div>
+      <label style="display:flex; align-items:center; gap:7px; margin-top:8px; font-size:12.5px; color:var(--text-secondary); cursor:pointer; font-weight:600;">
+        <input type="checkbox" id="chk-ingresado-sistema" ${yaIngresado ? 'checked' : ''} style="width:15px; height:15px; cursor:pointer;">
+        Ingresado a sistema
+      </label>
     </div>
     <div class="entidad-detail-body">
       ${programaBlocks || '<div class="hint">Esta entidad no tiene programas asignados.</div>'}
@@ -939,6 +973,10 @@ function openEvaluacionDetail(rut){
   `;
   $('#evaluacion-detail-close').addEventListener('click', closeEvaluacionDetail);
   $('#evaluacion-split').classList.add('detail-open');
+  const chkIngresado = $('#chk-ingresado-sistema');
+  if (chkIngresado) {
+    chkIngresado.addEventListener('change', () => toggleIngresado(e.rut, e.nombre, chkIngresado));
+  }
   itemsPorProgramaList.forEach((items, i) => {
     const holder = $(`#eval-items-${i}`);
     if (holder) renderCoberturaItems(holder, { items });
