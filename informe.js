@@ -462,6 +462,35 @@ function rebuildData(){
   py49Rows.forEach(r => addProyecto(r.Entidad, 'DS49', r['Nº FAMILIAS']));
   py27Rows.forEach(r => addProyecto(r.Entidad, 'DS27', r.Nfamilias));
   py10Rows.forEach(r => addProyecto(r['Entidad Patrocinante'], 'DS10', r.Familias));
+
+  // Detalle de proyectos (nombre, comuna, familias) por entidad y programa,
+  // usado en la vista "Detalle Evaluación" - a diferencia de proyectosPorEntidad
+  // (solo totales), aquí se guarda cada proyecto individual.
+  const proyectosDetallePorEntidad = new Map();
+  function addProyectoDetalle(nombreRaw, programa, nombreProyecto, comuna, familias){
+    if (!nombreRaw) return;
+    const key = normName(nombreRaw);
+    if (!proyectosDetallePorEntidad.has(key)) {
+      proyectosDetallePorEntidad.set(key, { DS49:[], DS27:[], DS10:[] });
+    }
+    const f = Number(familias);
+    proyectosDetallePorEntidad.get(key)[programa].push({
+      nombre: (nombreProyecto||'').toString().trim() || '(sin nombre)',
+      comuna: (comuna||'').toString().trim(),
+      familias: isNaN(f) ? 0 : f,
+    });
+  }
+  py49Rows.forEach(r => addProyectoDetalle(r.Entidad, 'DS49', r['NOMBRE PROYECTO'], r.COMUNA, r['Nº FAMILIAS']));
+  py27Rows.forEach(r => addProyectoDetalle(r.Entidad, 'DS27', r['Nombre proyecto'], r.COMUNA, r.Nfamilias));
+  py10Rows.forEach(r => addProyectoDetalle(r['Entidad Patrocinante'], 'DS10', r['Nombre del proyecto'], r.Comuna, r.Familias));
+  function findProyectosDetalle(nombre){
+    const n = normName(nombre);
+    if (proyectosDetallePorEntidad.has(n)) return proyectosDetallePorEntidad.get(n);
+    for (const [k,v] of proyectosDetallePorEntidad.entries()){
+      if (k.startsWith(n.slice(0,18)) || n.startsWith(k.slice(0,18))) return v;
+    }
+    return { DS49:[], DS27:[], DS10:[] };
+  }
   function findProyectos(nombre){
     const n = normName(nombre);
     if (proyectosPorEntidad.has(n)) return proyectosPorEntidad.get(n);
@@ -493,6 +522,7 @@ function rebuildData(){
       y2024: hist ? hist.y2024 : null, y2025: hist ? hist.y2025 : null,
       proyectos: proy ? proy.count : 0, familias: proy ? proy.familias : 0,
       familiasPorPrograma: proy ? proy.familiasPorPrograma : {DS49:0,DS27:0,DS10:0},
+      proyectosDetalle: findProyectosDetalle(e.nombre),
       numEvaluadores: evaluadoresSet.size,
     };
   });
@@ -777,6 +807,131 @@ function paintEntidadesTable(){
     </tr>
   `).join('') || `<tr><td colspan="10"><div class="empty-state">No hay entidades que coincidan con los filtros.</div></td></tr>`;
   $$('#tbl-entidades tbody tr').forEach(tr => tr.addEventListener('click', () => openEntidadDetail(tr.dataset.rut)));
+}
+
+/* ======================================================================
+   "Detalle Evaluación" — por entidad: programa, proyectos asociados a ese
+   programa, calificadores (con RUT) y etapas calificadas. Se agrupa por
+   PROGRAMA (no por cobertura programa+provincia): si una entidad tiene el
+   mismo programa en más de una provincia, se fusionan en un solo bloque.
+   ====================================================================== */
+let selectedEvalRut = null;
+function renderEvaluacion(){
+  const el = $('#view-evaluacion');
+  selectedEvalRut = null;
+  el.innerHTML = `
+    <div class="entidades-split" id="evaluacion-split">
+      <div class="entidades-list-pane">
+        <div class="card">
+          <div class="table-toolbar">
+            <span class="count" id="eval-count"></span>
+          </div>
+          <div class="card-scroll">
+            <table class="data" id="tbl-evaluacion" style="table-layout:fixed; min-width:520px">
+              <colgroup><col style="width:60%"><col style="width:20%"><col style="width:20%"></colgroup>
+              <thead><tr>
+                <th>Entidad</th>
+                <th class="num-center">Programa(s)</th>
+                <th class="num-center">Evaluadores</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <aside class="entidad-detail-pane" id="evaluacion-detail-pane"></aside>
+    </div>
+  `;
+  paintEvaluacionTable();
+}
+function paintEvaluacionTable(){
+  const list = filteredEntidades().slice().sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  $('#eval-count').textContent = `${list.length} entidades`;
+  const tbody = $('#tbl-evaluacion tbody');
+  tbody.innerHTML = list.map(e => `
+    <tr data-rut="${esc(e.rut)}" class="${e.rut===selectedEvalRut?'selected':''}">
+      <td><div class="wrap-name">${esc(e.nombre)}</div></td>
+      <td class="num-center">${e.programas.map(p=>`<span class="pill"><span class="dot" style="background:${PROGRAMA_COLOR[p]}"></span>${esc(p)}</span>`).join(' ')}</td>
+      <td class="num-center">${fmt0(e.numEvaluadores)}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="3"><div class="empty-state">No hay entidades que coincidan con los filtros.</div></td></tr>`;
+  $$('#tbl-evaluacion tbody tr').forEach(tr => tr.addEventListener('click', () => openEvaluacionDetail(tr.dataset.rut)));
+}
+function openEvaluacionDetail(rut){
+  const e = entidadesList.find(x=>x.rut===rut);
+  if (!e) return;
+  selectedEvalRut = rut;
+  $$('#tbl-evaluacion tbody tr').forEach(tr => tr.classList.toggle('selected', tr.dataset.rut===rut));
+
+  const pane = $('#evaluacion-detail-pane');
+  const proyDetalle = e.proyectosDetalle || {DS49:[],DS27:[],DS10:[]};
+
+  const programaBlocks = e.programas.map(p => {
+    const proyectos = proyDetalle[p] || [];
+    const totalFamilias = proyectos.reduce((s,x)=>s+(x.familias||0),0);
+    const proyectosHtml = proyectos.length ? `
+      <div class="card-scroll">
+      <table class="data compact-cols" style="min-width:0; width:100%; table-layout:fixed">
+        <colgroup><col style="width:55%"><col style="width:25%"><col style="width:20%"></colgroup>
+        <thead><tr><th>Proyecto</th><th>Comuna</th><th class="num-center">Familias</th></tr></thead>
+        <tbody>
+          ${proyectos.map(x=>`<tr><td class="wrap-name">${esc(x.nombre)}</td><td>${esc(x.comuna)}</td><td class="num-center">${fmt0(x.familias)}</td></tr>`).join('')}
+          <tr style="font-weight:700"><td colspan="2">Total</td><td class="num-center">${fmt0(totalFamilias)}</td></tr>
+        </tbody>
+      </table>
+      </div>
+    ` : `<div class="hint">Sin proyectos registrados para este programa.</div>`;
+
+    // Calificadores y etapas: unión de todas las coberturas (provincias) de este programa
+    const cobsPrograma = e.coberturas.filter(c => c.programa === p);
+    const evaluadoresMap = new Map(); // rut -> nombre
+    const etapasSet = new Set();
+    cobsPrograma.forEach(c => {
+      c.items.forEach(it => {
+        if (it.evaluadorRut) evaluadoresMap.set(it.evaluadorRut, it.evaluador || '');
+        if (it.stage != null) etapasSet.add(Number(it.stage));
+      });
+    });
+    const evaluadoresList = Array.from(evaluadoresMap.entries()).sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
+    const etapasList = Array.from(etapasSet).sort((a,b)=>a-b);
+
+    return `
+      <div class="rubric-card" style="margin-bottom:12px">
+        <div class="rubric-header">${esc(p)}</div>
+        <div class="rubric-desc" style="background:var(--surface-1); border-bottom:1px solid var(--border)">
+          <h4 style="margin:0 0 6px;font-size:12.5px;color:var(--text-primary)">Proyectos (${proyectos.length})</h4>
+          ${proyectosHtml}
+        </div>
+        <div class="rubric-desc" style="background:var(--surface-1); border-bottom:1px solid var(--border)">
+          <h4 style="margin:0 0 6px;font-size:12.5px;color:var(--text-primary)">Calificadores (${evaluadoresList.length})</h4>
+          ${evaluadoresList.length ? `<div class="taglist">${evaluadoresList.map(([rut,nombre])=>`<span class="pill">${esc(nombre||'(sin nombre)')} · ${esc(rut)}</span>`).join('')}</div>` : `<div class="hint">Sin evaluadores registrados.</div>`}
+        </div>
+        <div class="rubric-desc" style="border-bottom:none">
+          <h4 style="margin:0 0 6px;font-size:12.5px;color:var(--text-primary)">Etapas calificadas</h4>
+          ${etapasList.length ? `<div class="taglist">${etapasList.map(s=>`<span class="pill">Etapa ${s}</span>`).join('')}</div>` : `<div class="hint">Sin etapas calificadas todavía.</div>`}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  pane.innerHTML = `
+    <div class="entidad-detail-head">
+      <button class="close" id="evaluacion-detail-close">Cerrar ✕</button>
+      <h2>${esc(e.nombre)}</h2>
+      <div class="meta">RUT ${esc(e.rut)} · ${esc(e.provincias.join(', '))}</div>
+    </div>
+    <div class="entidad-detail-body">
+      ${programaBlocks || '<div class="hint">Esta entidad no tiene programas asignados.</div>'}
+    </div>
+  `;
+  $('#evaluacion-detail-close').addEventListener('click', closeEvaluacionDetail);
+  $('#evaluacion-split').classList.add('detail-open');
+}
+function closeEvaluacionDetail(){
+  selectedEvalRut = null;
+  const split = $('#evaluacion-split');
+  if (split) split.classList.remove('detail-open');
+  $$('#tbl-evaluacion tbody tr').forEach(tr => tr.classList.remove('selected'));
 }
 
 /**
@@ -1154,10 +1309,11 @@ function exportXlsx(filename, sheetName, headers, rows){
 /* ======================================================================
    12. Navegación / filtros / arranque
    ====================================================================== */
-const RENDERERS = { entidades: renderEntidades, historico: renderHistorico };
+const RENDERERS = { entidades: renderEntidades, historico: renderHistorico, evaluacion: renderEvaluacion };
 const VIEW_TITLES = {
   entidades: ['Entidades', 'Detalle y ranking de Entidades Patrocinantes'],
   historico: ['Histórico', 'Evolución de puntajes 2021–2026'],
+  evaluacion: ['Detalle Evaluación', 'Programa, proyectos, calificadores y etapas calificadas por entidad'],
 };
 function setView(view){
   state.view = view;
@@ -1190,7 +1346,9 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (isCommentModalOpen()) { closeCommentModal(); return; }
   const split = $('#entidades-split');
-  if (split && split.classList.contains('detail-open')) closeEntidadDetail();
+  if (split && split.classList.contains('detail-open')) { closeEntidadDetail(); return; }
+  const evalSplit = $('#evaluacion-split');
+  if (evalSplit && evalSplit.classList.contains('detail-open')) closeEvaluacionDetail();
 });
 
 let booted = false;
