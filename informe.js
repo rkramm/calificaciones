@@ -22,6 +22,34 @@ const mean = arr => arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : null;
 const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 /**
+ * navigator.clipboard.writeText() requiere un "secure context" (https o
+ * localhost) - falla silenciosamente al abrir informe.html directo desde
+ * el disco (file://), que es como se usó este informe mientras GitHub
+ * Pages estaba caído. Por eso hay un fallback con el método clásico
+ * (textarea oculto + document.execCommand('copy')), que sí funciona ahí.
+ */
+async function copyToClipboard(text){
+  if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (err) { /* sigue al fallback */ }
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
  * Promedio POR ÍTEM (no por evaluador): cuando más de un evaluador califica
  * el mismo ítem (código de rúbrica, ej. "4.7"), esas notas se promedian
  * primero y ESE promedio (redondeado a entero) queda como "la nota" oficial
@@ -215,10 +243,22 @@ async function loadAllData(){
   ];
   const results = {};
   const statusEl = document.getElementById('data-status');
-  for (let i = 0; i < tables.length; i++) {
-    const [key, label] = tables[i];
-    if (statusEl) statusEl.textContent = `Cargando ${label}… (${i + 1}/${tables.length})`;
-    results[key] = await cloudGet(key);
+  const progressWrap = document.getElementById('load-progress-wrap');
+  const progressLabel = document.getElementById('load-progress-label');
+  const progressFill = document.getElementById('load-progress-fill');
+  if (progressWrap) progressWrap.classList.remove('hidden');
+  try {
+    for (let i = 0; i < tables.length; i++) {
+      const [key, label] = tables[i];
+      const statusTxt = `Cargando ${label}… (${i + 1}/${tables.length})`;
+      if (statusEl) statusEl.textContent = statusTxt;
+      if (progressLabel) progressLabel.textContent = statusTxt;
+      if (progressFill) progressFill.style.width = Math.round((i / tables.length) * 100) + '%';
+      results[key] = await cloudGet(key);
+      if (progressFill) progressFill.style.width = Math.round(((i + 1) / tables.length) * 100) + '%';
+    }
+  } finally {
+    if (progressWrap) progressWrap.classList.add('hidden');
   }
   entidadesRows    = Array.isArray(results.entidades) ? results.entidades : [];
   asignacionesRows = Array.isArray(results.asignaciones) ? results.asignaciones : [];
@@ -858,12 +898,16 @@ function renderEvaluacion(){
             <span class="count" id="eval-count"></span>
           </div>
           <div class="card-scroll">
-            <table class="data" id="tbl-evaluacion" style="table-layout:fixed; min-width:520px">
-              <colgroup><col style="width:60%"><col style="width:20%"><col style="width:20%"></colgroup>
+            <table class="data" id="tbl-evaluacion" style="table-layout:fixed; min-width:760px">
+              <colgroup><col style="width:32%"><col style="width:14%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:10%"></colgroup>
               <thead><tr>
                 <th>Entidad</th>
                 <th class="num-center">Programa(s)</th>
                 <th class="num-center">Evaluadores</th>
+                <th class="num-center">DS10</th>
+                <th class="num-center">DS27</th>
+                <th class="num-center">DS49</th>
+                <th class="num-center">Promedio final</th>
               </tr></thead>
               <tbody></tbody>
             </table>
@@ -879,13 +923,23 @@ function paintEvaluacionTable(){
   const list = filteredEntidades().slice().sort((a,b)=>a.nombre.localeCompare(b.nombre));
   $('#eval-count').textContent = `${list.length} entidades`;
   const tbody = $('#tbl-evaluacion tbody');
-  tbody.innerHTML = list.map(e => `
+  tbody.innerHTML = list.map(e => {
+    const calc = computeCalculoNota(e);
+    const porPrograma = {};
+    calc.columnas.forEach(c => { porPrograma[c.programa] = c.resultado; });
+    const notaCol = p => porPrograma[p] != null ? fmt0(porPrograma[p]) : '—';
+    return `
     <tr data-rut="${esc(e.rut)}" class="${e.rut===selectedEvalRut?'selected':''}">
       <td><div class="wrap-name">${esc(e.nombre)}${comentariosMap.get(e.rut)?.ingresado ? ' <span class="badge good" title="Ingresado a sistema"><span class="dot" style="background:var(--good)"></span>OK</span>' : ''}</div></td>
       <td class="num-center">${e.programas.map(p=>`<span class="pill"><span class="dot" style="background:${PROGRAMA_COLOR[p]}"></span>${esc(p)}</span>`).join(' ')}</td>
       <td class="num-center">${fmt0(e.numEvaluadores)}</td>
+      <td class="num-center">${notaCol('DS10')}</td>
+      <td class="num-center">${notaCol('DS27')}</td>
+      <td class="num-center">${notaCol('DS49')}</td>
+      <td class="num-center">${calc.resultadoFinal!=null?scoreBadge(calc.resultadoFinal):'—'}</td>
     </tr>
-  `).join('') || `<tr><td colspan="3"><div class="empty-state">No hay entidades que coincidan con los filtros.</div></td></tr>`;
+  `;
+  }).join('') || `<tr><td colspan="7"><div class="empty-state">No hay entidades que coincidan con los filtros.</div></td></tr>`;
   $$('#tbl-evaluacion tbody tr').forEach(tr => tr.addEventListener('click', () => openEvaluacionDetail(tr.dataset.rut)));
 }
 function openEvaluacionDetail(rut){
@@ -897,6 +951,7 @@ function openEvaluacionDetail(rut){
   const pane = $('#evaluacion-detail-pane');
   const proyDetalle = e.proyectosDetalle || {DS49:[],DS27:[],DS10:[]};
   const itemsPorProgramaList = []; // para renderCoberturaItems() después de pintar el HTML
+  const calculoNota = computeCalculoNota(e);
 
   const programaBlocks = e.programas.map((p, pIdx) => {
     const proyectos = proyDetalle[p] || [];
@@ -968,6 +1023,7 @@ function openEvaluacionDetail(rut){
       </label>
     </div>
     <div class="entidad-detail-body">
+      ${calculoNotaHtml(calculoNota, e, 'eval-')}
       ${programaBlocks || '<div class="hint">Esta entidad no tiene programas asignados.</div>'}
     </div>
   `;
@@ -976,6 +1032,17 @@ function openEvaluacionDetail(rut){
   const chkIngresado = $('#chk-ingresado-sistema');
   if (chkIngresado) {
     chkIngresado.addEventListener('change', () => toggleIngresado(e.rut, e.nombre, chkIngresado));
+  }
+  const btnGuardarNotaEval = $('#eval-btn-guardar-nota-manual');
+  if (btnGuardarNotaEval) {
+    btnGuardarNotaEval.addEventListener('click', async () => {
+      const val = $('#eval-calculo-nota-manual-input').value;
+      const existing = comentariosMap.get(e.rut);
+      const comentarioExistente = existing ? existing.comentario : '';
+      btnGuardarNotaEval.disabled = true;
+      await saveComentario(e.rut, e.nombre, val, comentarioExistente);
+      openEvaluacionDetail(e.rut);
+    });
   }
   itemsPorProgramaList.forEach((items, i) => {
     const holder = $(`#eval-items-${i}`);
@@ -1001,8 +1068,6 @@ function closeEvaluacionDetail(){
  * % de participación se recalcula solo entre los programas ya evaluados.
  */
 function computeCalculoNota(e){
-  if (e.coberturas.length <= 1) return null;
-
   const porPrograma = {};
   e.coberturas.forEach(c => {
     if (!porPrograma[c.programa]) porPrograma[c.programa] = { items: [] };
@@ -1036,8 +1101,8 @@ function computeCalculoNota(e){
   return { columnas, totalFamilias, resultadoFinal, completo: evaluadas.length === columnas.length };
 }
 
-function calculoNotaHtml(calc, e){
-  if (!calc) return '';
+function calculoNotaHtml(calc, e, idPrefix=''){
+  if (!calc || calc.columnas.length <= 1) return '';
   const cols = calc.columnas;
   const manual = comentariosMap.get(e.rut)?.calificacion;
   const manualVal = manual != null ? manual : null;
@@ -1078,10 +1143,10 @@ function calculoNotaHtml(calc, e){
       <div class="kv-row" style="margin-top:4px">
         <span class="k">Nota final (comisión)</span>
         <span class="v" style="gap:8px">
-          <input type="number" id="calculo-nota-manual-input" min="0" max="100" step="1"
+          <input type="number" id="${idPrefix}calculo-nota-manual-input" min="0" max="100" step="1"
             value="${manualVal!=null?manualVal:''}" placeholder="${calc.resultadoFinal!=null?fmt0(calc.resultadoFinal):'—'}"
             style="width:64px; background:var(--surface-2); border:1px solid var(--border); color:var(--text-primary); border-radius:6px; padding:5px 8px; font:inherit; font-size:13px;">
-          <button type="button" id="btn-guardar-nota-manual" class="comment-modal-btn primary" style="padding:5px 10px;">Guardar</button>
+          <button type="button" id="${idPrefix}btn-guardar-nota-manual" class="comment-modal-btn primary" style="padding:5px 10px;">Guardar</button>
         </span>
       </div>
       <div class="hint" style="margin-top:4px">Dejar vacío y guardar para volver al resultado automático. Se guarda como la calificación de consenso de esta entidad.</div>
@@ -1268,15 +1333,16 @@ function renderCoberturaItems(holder, cobertura){
   $$('.rubric-copy-btn', holder).forEach(btn => {
     btn.addEventListener('click', async () => {
       const vals = copyValuesByStage[btn.dataset.stage] || [];
-      const text = vals.join('\n');
+      // Separado por TAB (no salto de línea): al pegar en un formulario con
+      // un campo por ítem, el tab salta automáticamente a la siguiente casilla.
+      const text = vals.join('\t');
       const original = btn.textContent;
-      try {
-        await navigator.clipboard.writeText(text);
-        btn.textContent = 'Copiado ✓';
-      } catch (err) {
-        alert('No se pudo copiar al portapapeles. Copia manualmente:\n\n' + text);
+      const ok = await copyToClipboard(text);
+      if (!ok) {
+        alert('No se pudo copiar al portapapeles. Copia manualmente:\n\n' + vals.join('\n'));
         return;
       }
+      btn.textContent = 'Copiado ✓';
       setTimeout(() => { btn.textContent = original; }, 1500);
     });
   });
