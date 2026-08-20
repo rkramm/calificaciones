@@ -80,6 +80,14 @@ function normName(s){
     .normalize('NFD').replace(/[̀-ͯ]/g,'')
     .replace(/\s+/g,' ');
 }
+function normRut(s){
+  // Distintas hojas registran el RUT con formato distinto (puntos, espacios,
+  // apóstrofe forzado por Sheets, k/K). Normalizar SIEMPRE al leer un RUT
+  // desde cualquier hoja, para que la comparación entre 'entidades' y
+  // 'asignaciones' (u otras) nunca falle por formato.
+  return (s||'').toString().trim().toUpperCase()
+    .replace(/^'/,'').replace(/\./g,'').replace(/\s+/g,'');
+}
 function normHeader(s){
   return (s||'').toString().trim().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g,'')
@@ -281,7 +289,7 @@ function parseBool(v){
 function loadComentariosFromRows(rows){
   comentariosMap = new Map();
   rows.forEach(r => {
-    const rut = (r.rut || '').toString().trim();
+    const rut = normRut(r.rut);
     if (!rut) return;
     comentariosMap.set(rut, {
       nombreEntidad: r.nombreEntidad || '',
@@ -428,7 +436,7 @@ function rebuildData(){
   const rutPorNombre  = new Map();
 
   entidadesRows.forEach(r => {
-    const rut = (r.rut||'').toString().trim();
+    const rut = normRut(r.rut);
     const nombre = (r.Nombre||'').toString().trim();
     if (!rut || !nombre) return;
     if (!entidadPorRut.has(rut)) {
@@ -489,7 +497,7 @@ function rebuildData(){
     // depender de que el texto del nombre calce con la hoja 'entidades'
     // (variantes de texto entre hojas causaban que coberturas completas
     // quedaran sin RUT resuelto y se excluyeran del informe en silencio).
-    const rutAsig = (r.rut || '').toString().trim();
+    const rutAsig = normRut(r.rut);
     if (rutAsig) c.rutAsignado = rutAsig;
   });
 
@@ -515,7 +523,7 @@ function rebuildData(){
   // Histórico (hoja 'Califica_historico': columnas Entidad, Rut, 2025, 2024, 2023, 2022, 2021)
   const historicoPorRut = new Map();
   historicoRows.forEach(r => {
-    const rut = String(getByHeader(r, ['RUT','Rut','rut']) || '').trim();
+    const rut = normRut(getByHeader(r, ['RUT','Rut','rut']));
     if (!rut) return;
     const years = {};
     HIST_YEARS.forEach(y => {
