@@ -80,14 +80,6 @@ function normName(s){
     .normalize('NFD').replace(/[̀-ͯ]/g,'')
     .replace(/\s+/g,' ');
 }
-function normRut(s){
-  // Distintas hojas registran el RUT con formato distinto (puntos, espacios,
-  // apóstrofe forzado por Sheets, k/K). Normalizar SIEMPRE al leer un RUT
-  // desde cualquier hoja, para que la comparación entre 'entidades' y
-  // 'asignaciones' (u otras) nunca falle por formato.
-  return (s||'').toString().trim().toUpperCase()
-    .replace(/^'/,'').replace(/\./g,'').replace(/\s+/g,'');
-}
 function normHeader(s){
   return (s||'').toString().trim().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g,'')
@@ -289,7 +281,7 @@ function parseBool(v){
 function loadComentariosFromRows(rows){
   comentariosMap = new Map();
   rows.forEach(r => {
-    const rut = normRut(r.rut);
+    const rut = (r.rut || '').toString().trim();
     if (!rut) return;
     comentariosMap.set(rut, {
       nombreEntidad: r.nombreEntidad || '',
@@ -436,7 +428,7 @@ function rebuildData(){
   const rutPorNombre  = new Map();
 
   entidadesRows.forEach(r => {
-    const rut = normRut(r.rut);
+    const rut = (r.rut||'').toString().trim();
     const nombre = (r.Nombre||'').toString().trim();
     if (!rut || !nombre) return;
     if (!entidadPorRut.has(rut)) {
@@ -491,14 +483,7 @@ function rebuildData(){
 
   asignacionesRows.forEach(r => {
     if (!r.entidadNombre) return;
-    const c = getCobertura(r.entidadNombre, r.programa, r.provincia);
-    // La hoja 'asignaciones' trae el RUT real de la entidad en cada fila —
-    // úsalo como fuente de verdad para vincular la cobertura, en vez de
-    // depender de que el texto del nombre calce con la hoja 'entidades'
-    // (variantes de texto entre hojas causaban que coberturas completas
-    // quedaran sin RUT resuelto y se excluyeran del informe en silencio).
-    const rutAsig = normRut(r.rut);
-    if (rutAsig) c.rutAsignado = rutAsig;
+    getCobertura(r.entidadNombre, r.programa, r.provincia);
   });
 
   coberturas.forEach(c => {
@@ -511,19 +496,13 @@ function rebuildData(){
     }
     const validStageAvgs = Object.values(c.stageAvg).filter(v => v != null);
     c.avgScore = validStageAvgs.length ? mean(validStageAvgs) : null;
-    // Preferir el RUT real de 'asignaciones' (autoritativo); si esta cobertura
-    // no tiene fila de asignación (solo scores sueltos), recurrir a la
-    // coincidencia por nombre contra 'entidades' como respaldo.
-    c.rut = c.rutAsignado || findRutByName(c.nombre);
-    if (!c.rut) {
-      console.warn('Cobertura sin RUT resuelto (no aparece en el informe de la entidad): ' + c.nombre + ' | ' + c.programa + ' | ' + c.provincia);
-    }
+    c.rut = findRutByName(c.nombre);
   });
 
   // Histórico (hoja 'Califica_historico': columnas Entidad, Rut, 2025, 2024, 2023, 2022, 2021)
   const historicoPorRut = new Map();
   historicoRows.forEach(r => {
-    const rut = normRut(getByHeader(r, ['RUT','Rut','rut']));
+    const rut = String(getByHeader(r, ['RUT','Rut','rut']) || '').trim();
     if (!rut) return;
     const years = {};
     HIST_YEARS.forEach(y => {
@@ -603,18 +582,10 @@ function rebuildData(){
     const proy = findProyectos(e.nombre);
     const evaluadoresSet = new Set();
     cobs.forEach(c => c.evaluadores.forEach(ev => evaluadoresSet.add(ev)));
-    // Unión de los programas declarados en la hoja 'entidades' con los programas
-    // que realmente tienen cobertura (asignaciones/scores). La hoja 'entidades'
-    // puede listar un solo programa "principal" por fila y quedar incompleta;
-    // sin esta unión, una entidad con cobertura real en un programa no listado
-    // ahí perdía su pill de Programa(s) y todo su bloque de detalle por ítem
-    // (programaBlocks), aunque sus notas sí aparecieran en el cálculo agregado.
-    const programasSet = new Set(e.programas);
-    cobs.forEach(c => { if (c.programa) programasSet.add(c.programa); });
     return {
       rut: e.rut, nombre: e.nombre,
       comunas: Array.from(e.comunas).sort(),
-      programas: Array.from(programasSet).sort((a,b)=>PROGRAMA_ORDER.indexOf(a)-PROGRAMA_ORDER.indexOf(b)),
+      programas: Array.from(e.programas).sort((a,b)=>PROGRAMA_ORDER.indexOf(a)-PROGRAMA_ORDER.indexOf(b)),
       provincias: Array.from(e.provincias).sort((a,b)=>PROVINCIA_ORDER.indexOf(a)-PROVINCIA_ORDER.indexOf(b)),
       coberturas: cobs,
       avgScoreGlobal, evaluadaCount: scored.length, pendienteCount: cobs.length - scored.length,
